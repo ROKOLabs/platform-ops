@@ -1,0 +1,79 @@
+name: Report a deployment to Roko
+description: Report the current GitHub Actions deployment to a Roko project
+
+inputs:
+  url:
+    description: Roko deployment reporting endpoint
+    required: true
+  token:
+    description: Roko deployment token
+    required: true
+  environment:
+    description: Deployment environment name
+    required: true
+  sha:
+    description: Deployed commit SHA; defaults to github.sha
+    required: false
+    default: ''
+  deploy-id:
+    description: Stable deployment attempt id; defaults to run_id-run_attempt
+    required: false
+    default: ''
+  strict:
+    description: Fail the step if Roko cannot record the deployment
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Report deployment from Linux or macOS
+      if: runner.os != 'Windows'
+      shell: bash
+      env:
+        INPUT_URL: ${{ inputs.url }}
+        INPUT_TOKEN: ${{ inputs.token }}
+        INPUT_ENVIRONMENT: ${{ inputs.environment }}
+        INPUT_SHA: ${{ inputs.sha }}
+        INPUT_DEPLOY_ID: ${{ inputs.deploy-id }}
+        INPUT_STRICT: ${{ inputs.strict }}
+      run: |
+        sha="${INPUT_SHA:-${GITHUB_SHA}}"
+        deploy_id="${INPUT_DEPLOY_ID:-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}}"
+        strict_arg=""
+        if [ "$INPUT_STRICT" = "true" ]; then
+          strict_arg="--strict"
+        fi
+        sh "$GITHUB_ACTION_PATH/../../core/roko-adapter.sh" deploy \
+          --url "$INPUT_URL" \
+          --token "$INPUT_TOKEN" \
+          --environment "$INPUT_ENVIRONMENT" \
+          --sha "$sha" \
+          --deploy-id "$deploy_id" \
+          $strict_arg
+
+    - name: Report deployment from Windows
+      if: runner.os == 'Windows'
+      shell: pwsh
+      env:
+        INPUT_URL: ${{ inputs.url }}
+        INPUT_TOKEN: ${{ inputs.token }}
+        INPUT_ENVIRONMENT: ${{ inputs.environment }}
+        INPUT_SHA: ${{ inputs.sha }}
+        INPUT_DEPLOY_ID: ${{ inputs.deploy-id }}
+        INPUT_STRICT: ${{ inputs.strict }}
+      run: |
+        $sha = if ($env:INPUT_SHA) { $env:INPUT_SHA } else { $env:GITHUB_SHA }
+        $deployId = if ($env:INPUT_DEPLOY_ID) { $env:INPUT_DEPLOY_ID } else { "$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT" }
+        $arguments = @(
+          'deploy',
+          '--url', $env:INPUT_URL,
+          '--token', $env:INPUT_TOKEN,
+          '--environment', $env:INPUT_ENVIRONMENT,
+          '--sha', $sha,
+          '--deploy-id', $deployId
+        )
+        if ($env:INPUT_STRICT -eq 'true') {
+          $arguments += '--strict'
+        }
+        & "$env:GITHUB_ACTION_PATH/../../core/roko-adapter.ps1" @arguments
