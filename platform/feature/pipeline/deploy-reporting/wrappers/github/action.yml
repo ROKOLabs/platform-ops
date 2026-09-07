@@ -1,20 +1,16 @@
 name: Report a deployment to Roko
-description: Report the current GitHub Actions deployment to a Roko project
+description: Report a product deployment to Roko
 
 inputs:
   url:
     description: Roko deployment reporting endpoint
     required: true
   token:
-    description: Roko deployment token
+    description: Roko deployment token from the project's deployment settings
     required: true
   environment:
     description: Deployment environment name
     required: true
-  sha:
-    description: Deployed commit SHA; defaults to github.sha
-    required: false
-    default: ''
   strict:
     description: Fail the step if Roko cannot record the deployment
     required: false
@@ -30,19 +26,17 @@ runs:
         INPUT_URL: ${{ inputs.url }}
         INPUT_TOKEN: ${{ inputs.token }}
         INPUT_ENVIRONMENT: ${{ inputs.environment }}
-        INPUT_SHA: ${{ inputs.sha }}
         INPUT_STRICT: ${{ inputs.strict }}
+        ROKO_SHA: ${{ github.sha }}
       run: |
-        sha="${INPUT_SHA:-${GITHUB_SHA}}"
         strict_arg=""
         if [ "$INPUT_STRICT" = "true" ]; then
           strict_arg="--strict"
         fi
-        sh "$GITHUB_ACTION_PATH/../../core/roko-adapter.sh" deploy \
+        sh "$GITHUB_ACTION_PATH/../../core/roko-adapter.sh" \
           --url "$INPUT_URL" \
           --token "$INPUT_TOKEN" \
           --environment "$INPUT_ENVIRONMENT" \
-          --sha "$sha" \
           $strict_arg
 
     - name: Report deployment from Windows
@@ -52,16 +46,13 @@ runs:
         INPUT_URL: ${{ inputs.url }}
         INPUT_TOKEN: ${{ inputs.token }}
         INPUT_ENVIRONMENT: ${{ inputs.environment }}
-        INPUT_SHA: ${{ inputs.sha }}
         INPUT_STRICT: ${{ inputs.strict }}
+        ROKO_SHA: ${{ github.sha }}
       run: |
-        $sha = if ($env:INPUT_SHA) { $env:INPUT_SHA } else { $env:GITHUB_SHA }
         $arguments = @(
-          'deploy',
           '--url', $env:INPUT_URL,
           '--token', $env:INPUT_TOKEN,
-          '--environment', $env:INPUT_ENVIRONMENT,
-          '--sha', $sha
+          '--environment', $env:INPUT_ENVIRONMENT
         )
         if ($env:INPUT_STRICT -eq 'true') {
           $arguments += '--strict'

@@ -19,11 +19,6 @@ function Exit-Adapter {
     exit 0
 }
 
-if ($args.Count -eq 0 -or $args[0] -ne 'deploy') {
-    Write-AdapterLog 'expected command deploy'
-    Exit-Adapter 2
-}
-
 $values = @{
     url = $env:ROKO_ENDPOINT_URL
     token = $env:ROKO_DEPLOY_TOKEN
@@ -31,7 +26,7 @@ $values = @{
     sha = $env:ROKO_SHA
 }
 
-$index = 1
+$index = 0
 while ($index -lt $args.Count) {
     $option = $args[$index]
     if ($option -eq '--strict') {
@@ -44,7 +39,6 @@ while ($index -lt $args.Count) {
         '--url' { 'url' }
         '--token' { 'token' }
         '--environment' { 'environment' }
-        '--sha' { 'sha' }
         default { $null }
     }
 
@@ -88,8 +82,9 @@ $body = [ordered]@{
 }
 $json = $body | ConvertTo-Json -Compress
 
+$retryDelays = @(2, 4, 8, 16)
 $attempt = 1
-while ($attempt -le 3) {
+while ($attempt -le 5) {
     $status = 0
     $responseBody = ''
     $networkError = $false
@@ -141,14 +136,14 @@ while ($attempt -le 3) {
     }
 
     $retry = $networkError -or $status -eq 429 -or ($status -ge 500 -and $status -lt 600)
-    if ($retry -and $attempt -lt 3) {
+    if ($retry -and $attempt -lt 5) {
         if ($networkError) {
             Write-AdapterLog "attempt $attempt failed with a network error; retrying"
         }
         else {
             Write-AdapterLog "attempt $attempt failed with HTTP $status; retrying"
         }
-        Start-Sleep -Seconds $(if ($attempt -eq 1) { 2 } else { 4 })
+        Start-Sleep -Seconds $retryDelays[$attempt - 1]
         $attempt += 1
         continue
     }
