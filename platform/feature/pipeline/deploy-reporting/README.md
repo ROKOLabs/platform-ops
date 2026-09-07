@@ -4,8 +4,9 @@ The deploy reporting adapter records a successful deployment in Roko after a
 delivery system finishes deploying it. Reporting does not fail the delivery job
 unless strict mode is enabled.
 
-The adapter sends only the environment name, deployed commit SHA, and optional
-deployment attempt id. It never deploys an application or infrastructure.
+The adapter sends the environment name and deployed commit SHA. It adds an
+internal per-invocation identifier so retries do not create duplicate records.
+It never deploys an application or infrastructure.
 
 ## GitHub Actions
 
