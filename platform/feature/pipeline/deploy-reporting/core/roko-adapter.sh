@@ -15,6 +15,15 @@ strict_exit() {
     exit 0
 }
 
+require_value() {
+    name=$1
+    value=$2
+    if [ -z "$value" ]; then
+        log "missing $name"
+        strict_exit 2
+    fi
+}
+
 json_escape() {
     printf '%s' "$1" | awk '
         BEGIN { ORS = ""; first = 1 }
@@ -86,17 +95,9 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
-for required_name in url token environment; do
-    case "$required_name" in
-        url) required_value=$url ;;
-        token) required_value=$token ;;
-        environment) required_value=$environment ;;
-    esac
-    if [ -z "$required_value" ]; then
-        log "missing $required_name"
-        strict_exit 2
-    fi
-done
+require_value url "$url"
+require_value token "$token"
+require_value environment "$environment"
 
 if [ -z "$sha" ]; then
     sha=$(git rev-parse HEAD 2>/dev/null || true)
