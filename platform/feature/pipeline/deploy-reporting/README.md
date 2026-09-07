@@ -23,17 +23,16 @@ Add this step after the deployment step:
 Replace `<COMMIT_SHA>` with the commit containing the adapter. A later release
 step can introduce a stable component tag.
 
-The action uses `github.sha` as the commit and
-`github.run_id-github.run_attempt` as the deployment id. Set the optional `sha`
-or `deploy-id` input to override either value. Set `strict: true` only when a
-failed report should fail the workflow step.
+The action uses `github.sha` as the commit. Set the optional `sha` input to
+override it. Set `strict: true` only when a failed report should fail the
+workflow step.
 
 ## Core scripts
 
 The POSIX shell and PowerShell cores use the same command:
 
 ```text
-deploy --url URL --token TOKEN --environment NAME [--sha SHA] [--deploy-id ID] [--strict]
+deploy --url URL --token TOKEN --environment NAME [--sha SHA] [--strict]
 ```
 
 Each flag overrides its matching environment variable:
@@ -44,10 +43,10 @@ Each flag overrides its matching environment variable:
 | `--token` | `ROKO_DEPLOY_TOKEN` |
 | `--environment` | `ROKO_ENVIRONMENT` |
 | `--sha` | `ROKO_SHA` |
-| `--deploy-id` | `ROKO_DEPLOY_ID` |
 | `--strict` | `ROKO_STRICT=1` |
 
-When no SHA is provided, the core uses `git rev-parse HEAD`. It retries network
+When no SHA is provided, the core uses `git rev-parse HEAD`. Each invocation
+generates one deployment ID and reuses it for every retry. It retries network
 errors, HTTP 429, and HTTP 5xx responses three times. Other HTTP errors are not
 retried.
 

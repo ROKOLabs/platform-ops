@@ -15,10 +15,6 @@ inputs:
     description: Deployed commit SHA; defaults to github.sha
     required: false
     default: ''
-  deploy-id:
-    description: Stable deployment attempt id; defaults to run_id-run_attempt
-    required: false
-    default: ''
   strict:
     description: Fail the step if Roko cannot record the deployment
     required: false
@@ -35,11 +31,9 @@ runs:
         INPUT_TOKEN: ${{ inputs.token }}
         INPUT_ENVIRONMENT: ${{ inputs.environment }}
         INPUT_SHA: ${{ inputs.sha }}
-        INPUT_DEPLOY_ID: ${{ inputs.deploy-id }}
         INPUT_STRICT: ${{ inputs.strict }}
       run: |
         sha="${INPUT_SHA:-${GITHUB_SHA}}"
-        deploy_id="${INPUT_DEPLOY_ID:-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}}"
         strict_arg=""
         if [ "$INPUT_STRICT" = "true" ]; then
           strict_arg="--strict"
@@ -49,7 +43,6 @@ runs:
           --token "$INPUT_TOKEN" \
           --environment "$INPUT_ENVIRONMENT" \
           --sha "$sha" \
-          --deploy-id "$deploy_id" \
           $strict_arg
 
     - name: Report deployment from Windows
@@ -60,18 +53,15 @@ runs:
         INPUT_TOKEN: ${{ inputs.token }}
         INPUT_ENVIRONMENT: ${{ inputs.environment }}
         INPUT_SHA: ${{ inputs.sha }}
-        INPUT_DEPLOY_ID: ${{ inputs.deploy-id }}
         INPUT_STRICT: ${{ inputs.strict }}
       run: |
         $sha = if ($env:INPUT_SHA) { $env:INPUT_SHA } else { $env:GITHUB_SHA }
-        $deployId = if ($env:INPUT_DEPLOY_ID) { $env:INPUT_DEPLOY_ID } else { "$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT" }
         $arguments = @(
           'deploy',
           '--url', $env:INPUT_URL,
           '--token', $env:INPUT_TOKEN,
           '--environment', $env:INPUT_ENVIRONMENT,
-          '--sha', $sha,
-          '--deploy-id', $deployId
+          '--sha', $sha
         )
         if ($env:INPUT_STRICT -eq 'true') {
           $arguments += '--strict'

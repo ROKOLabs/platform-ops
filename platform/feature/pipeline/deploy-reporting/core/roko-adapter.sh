@@ -24,6 +24,18 @@ require_value() {
     fi
 }
 
+generate_deploy_id() {
+    if [ -r /dev/urandom ] && command -v od >/dev/null 2>&1 && command -v tr >/dev/null 2>&1; then
+        generated_id=$(od -An -N16 -tx1 /dev/urandom 2>/dev/null | tr -d '[:space:]')
+        if [ -n "$generated_id" ]; then
+            printf '%s' "$generated_id"
+            return
+        fi
+    fi
+
+    printf '%s-%s-%s' "$sha" "$(date -u +%Y%m%dT%H%M%SZ)" "$$"
+}
+
 json_escape() {
     printf '%s' "$1" | awk '
         BEGIN { ORS = ""; first = 1 }
@@ -58,7 +70,6 @@ url=${ROKO_ENDPOINT_URL:-}
 token=${ROKO_DEPLOY_TOKEN:-}
 environment=${ROKO_ENVIRONMENT:-}
 sha=${ROKO_SHA:-}
-deploy_id=${ROKO_DEPLOY_ID:-}
 
 if [ "${1:-}" != "deploy" ]; then
     log "expected command deploy"
@@ -68,7 +79,7 @@ shift
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        --url|--token|--environment|--sha|--deploy-id)
+        --url|--token|--environment|--sha)
             option=$1
             if [ "$#" -lt 2 ]; then
                 log "missing value for $option"
@@ -80,7 +91,6 @@ while [ "$#" -gt 0 ]; do
                 --token) token=$value ;;
                 --environment) environment=$value ;;
                 --sha) sha=$value ;;
-                --deploy-id) deploy_id=$value ;;
             esac
             shift 2
             ;;
@@ -114,12 +124,9 @@ fi
 
 environment_json=$(json_escape "$environment")
 sha_json=$(json_escape "$sha")
-if [ -n "$deploy_id" ]; then
-    deploy_id_json=$(json_escape "$deploy_id")
-    payload=$(printf '{"environment":"%s","sha":"%s","deployId":"%s"}' "$environment_json" "$sha_json" "$deploy_id_json")
-else
-    payload=$(printf '{"environment":"%s","sha":"%s"}' "$environment_json" "$sha_json")
-fi
+deploy_id=$(generate_deploy_id)
+deploy_id_json=$(json_escape "$deploy_id")
+payload=$(printf '{"environment":"%s","sha":"%s","deployId":"%s"}' "$environment_json" "$sha_json" "$deploy_id_json")
 
 response_file=$(mktemp "${TMPDIR:-/tmp}/roko-adapter-response.XXXXXX") || {
     log "could not create a temporary response file"

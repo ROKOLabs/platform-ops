@@ -29,7 +29,6 @@ $values = @{
     token = $env:ROKO_DEPLOY_TOKEN
     environment = $env:ROKO_ENVIRONMENT
     sha = $env:ROKO_SHA
-    deployId = $env:ROKO_DEPLOY_ID
 }
 
 $index = 1
@@ -46,7 +45,6 @@ while ($index -lt $args.Count) {
         '--token' { 'token' }
         '--environment' { 'environment' }
         '--sha' { 'sha' }
-        '--deploy-id' { 'deployId' }
         default { $null }
     }
 
@@ -86,9 +84,7 @@ if ([string]::IsNullOrWhiteSpace([string]$values.sha)) {
 $body = [ordered]@{
     environment = [string]$values.environment
     sha = [string]$values.sha
-}
-if (-not [string]::IsNullOrEmpty([string]$values.deployId)) {
-    $body.deployId = [string]$values.deployId
+    deployId = [guid]::NewGuid().ToString('N')
 }
 $json = $body | ConvertTo-Json -Compress
 
