@@ -13,12 +13,15 @@ Add this step after the deployment step:
 
 ```yaml
 - name: Report the deployment to Roko
-  uses: ROKOLabs/platform-ops/platform/feature/pipeline/deploy-reporting/wrappers/github@deploy-reporting-v1
+  uses: ROKOLabs/platform-ops/platform/feature/pipeline/deploy-reporting/wrappers/github@<COMMIT_SHA>
   with:
     url: https://platform.example.com/api/deploys
     token: ${{ secrets.ROKO_DEPLOY_TOKEN }}
     environment: prod
 ```
+
+Replace `<COMMIT_SHA>` with the commit containing the adapter. A later release
+step can introduce a stable component tag.
 
 The action uses `github.sha` as the commit and
 `github.run_id-github.run_attempt` as the deployment id. Set the optional `sha`
@@ -51,11 +54,3 @@ retried.
 Without strict mode, every reporting outcome exits with code 0. With strict
 mode, missing input exits 2, an HTTP or network failure exits 3, and a missing
 `curl` command in the shell core exits 4.
-
-## Repository CI and releases
-
-Repository CI tests the cores and GitHub wrapper. It deploys nothing.
-
-A `deploy-reporting-vMAJOR.MINOR.PATCH` tag creates a GitHub release containing
-both core scripts, a component archive, and `SHA256SUMS`. The release workflow
-moves the matching `deploy-reporting-vMAJOR` tag after the release succeeds.
