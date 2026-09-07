@@ -25,8 +25,8 @@ require_value() {
 }
 
 generate_deploy_id() {
-	if [ -r /dev/urandom ] && command -v od > /dev/null 2>&1 && command -v tr > /dev/null 2>&1; then
-		generated_id=$(od -An -N16 -tx1 /dev/urandom 2> /dev/null | tr -d '[:space:]')
+	if [ -r /dev/urandom ] && command -v od >/dev/null 2>&1 && command -v tr >/dev/null 2>&1; then
+		generated_id=$(od -An -N16 -tx1 /dev/urandom 2>/dev/null | tr -d '[:space:]')
 		if [ -n "$generated_id" ]; then
 			printf '%s' "$generated_id"
 			return
@@ -52,10 +52,10 @@ json_escape() {
 }
 
 response_text() {
-	response=$(tr '\r\n' '  ' < "$1" 2> /dev/null || true)
+	response=$(tr '\r\n' '  ' <"$1" 2>/dev/null || true)
 	case "$response" in
-		*"$token"*) printf '%s' '[redacted]' ;;
-		*) printf '%s' "$response" ;;
+	*"$token"*) printf '%s' '[redacted]' ;;
+	*) printf '%s' "$response" ;;
 	esac
 }
 
@@ -73,28 +73,28 @@ sha=${ROKO_SHA:-}
 
 while [ "$#" -gt 0 ]; do
 	case "$1" in
-		--url | --token | --environment)
-			option=$1
-			if [ "$#" -lt 2 ]; then
-				log "missing value for $option"
-				strict_exit 2
-			fi
-			value=$2
-			case "$option" in
-				--url) url=$value ;;
-				--token) token=$value ;;
-				--environment) environment=$value ;;
-			esac
-			shift 2
-			;;
-		--strict)
-			strict=1
-			shift
-			;;
-		*)
-			log "unknown option $1"
+	--url | --token | --environment)
+		option=$1
+		if [ "$#" -lt 2 ]; then
+			log "missing value for $option"
 			strict_exit 2
-			;;
+		fi
+		value=$2
+		case "$option" in
+		--url) url=$value ;;
+		--token) token=$value ;;
+		--environment) environment=$value ;;
+		esac
+		shift 2
+		;;
+	--strict)
+		strict=1
+		shift
+		;;
+	*)
+		log "unknown option $1"
+		strict_exit 2
+		;;
 	esac
 done
 
@@ -103,14 +103,14 @@ require_value token "$token"
 require_value environment "$environment"
 
 if [ -z "$sha" ]; then
-	sha=$(git rev-parse HEAD 2> /dev/null || true)
+	sha=$(git rev-parse HEAD 2>/dev/null || true)
 fi
 if [ -z "$sha" ]; then
 	log "missing sha"
 	strict_exit 2
 fi
 
-if ! command -v curl > /dev/null 2>&1; then
+if ! command -v curl >/dev/null 2>&1; then
 	log "curl is required"
 	strict_exit 4
 fi
@@ -134,8 +134,8 @@ trap 'rm -f "$response_file" "$error_file"' EXIT HUP INT TERM
 
 attempt=1
 while [ "$attempt" -le 5 ]; do
-	: > "$response_file"
-	: > "$error_file"
+	: >"$response_file"
+	: >"$error_file"
 	status=$(curl --silent --show-error \
 		--connect-timeout 10 \
 		--max-time 10 \
@@ -144,10 +144,10 @@ while [ "$attempt" -le 5 ]; do
 		--header "Authorization: Bearer $token" \
 		--header 'Content-Type: application/json' \
 		--data "$payload" \
-		"$url" 2> "$error_file")
+		"$url" 2>"$error_file")
 	curl_exit=$?
 
-	if [ "$curl_exit" -eq 0 ] && [ "$status" -ge 200 ] 2> /dev/null && [ "$status" -lt 300 ] 2> /dev/null; then
+	if [ "$curl_exit" -eq 0 ] && [ "$status" -ge 200 ] 2>/dev/null && [ "$status" -lt 300 ] 2>/dev/null; then
 		log "reported $sha to $environment"
 		exit 0
 	fi
@@ -155,7 +155,7 @@ while [ "$attempt" -le 5 ]; do
 	retry=0
 	if [ "$curl_exit" -ne 0 ] || [ "$status" = "429" ]; then
 		retry=1
-	elif [ "$status" -ge 500 ] 2> /dev/null && [ "$status" -lt 600 ] 2> /dev/null; then
+	elif [ "$status" -ge 500 ] 2>/dev/null && [ "$status" -lt 600 ] 2>/dev/null; then
 		retry=1
 	fi
 
@@ -166,10 +166,10 @@ while [ "$attempt" -le 5 ]; do
 			log "attempt $attempt failed with HTTP $status; retrying"
 		fi
 		case "$attempt" in
-			1) sleep 2 ;;
-			2) sleep 4 ;;
-			3) sleep 8 ;;
-			4) sleep 16 ;;
+		1) sleep 2 ;;
+		2) sleep 4 ;;
+		3) sleep 8 ;;
+		4) sleep 16 ;;
 		esac
 		attempt=$((attempt + 1))
 		continue

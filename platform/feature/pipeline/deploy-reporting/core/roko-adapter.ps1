@@ -20,10 +20,10 @@ function Exit-Adapter {
 }
 
 $values = @{
-    url = $env:ROKO_ENDPOINT_URL
-    token = $env:ROKO_DEPLOY_TOKEN
+    url         = $env:ROKO_ENDPOINT_URL
+    token       = $env:ROKO_DEPLOY_TOKEN
     environment = $env:ROKO_ENVIRONMENT
-    sha = $env:ROKO_SHA
+    sha         = $env:ROKO_SHA
 }
 
 $index = 0
@@ -77,8 +77,8 @@ if ([string]::IsNullOrWhiteSpace([string]$values.sha)) {
 
 $body = [ordered]@{
     environment = [string]$values.environment
-    sha = [string]$values.sha
-    deployId = [guid]::NewGuid().ToString('N')
+    sha         = [string]$values.sha
+    deployId    = [guid]::NewGuid().ToString('N')
 }
 $json = $body | ConvertTo-Json -Compress
 

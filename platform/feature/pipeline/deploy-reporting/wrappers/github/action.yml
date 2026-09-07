@@ -1,6 +1,5 @@
 name: Report a deployment to Roko
 description: Report a product deployment to Roko
-
 inputs:
   url:
     description: Roko deployment reporting endpoint
@@ -15,7 +14,6 @@ inputs:
     description: Fail the step if Roko cannot record the deployment
     required: false
     default: 'false'
-
 runs:
   using: composite
   steps:
@@ -38,7 +36,6 @@ runs:
           --token "$INPUT_TOKEN" \
           --environment "$INPUT_ENVIRONMENT" \
           $strict_arg
-
     - name: Report deployment from Windows
       if: runner.os == 'Windows'
       shell: pwsh
