@@ -1,0 +1,5 @@
+{
+  "$schema": "https://dprint.dev/schemas/v0.json",
+  "includes": ["**/*.ps1"],
+  "plugins": ["https://plugins.dprint.dev/kjanat/pwsh-0.2.0.wasm"]
+}
