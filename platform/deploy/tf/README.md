@@ -45,14 +45,14 @@ az storage container create --name tfstate --account-name acmeprodtfstate
 
 ## 2. Copy the deployment root
 
-Copy one directory into your own repository. It is a complete root: the
-`terraform` block, the provider configuration, the module call, and the outputs
-Ops needs. Nothing else has to be written.
+Copy one file into your own repository. It is a complete root: the `terraform`
+block, the provider configuration, the module call, and the outputs Ops needs.
+Nothing else has to be written.
 
 | Cloud | Copy |
 | --- | --- |
-| AWS | [`examples/aws`](examples/aws) |
-| Azure | [`examples/azure`](examples/azure) |
+| AWS | [`examples/aws/main.tf`](examples/aws/main.tf) |
+| Azure | [`examples/azure/main.tf`](examples/azure/main.tf) |
 
 The provider blocks are in that file rather than inside the module on purpose. A
 module that carries its own provider configuration is a legacy module in
@@ -69,16 +69,16 @@ Together those are what make a single apply possible.
 
 ## 3. Fill in the values
 
-Rename `terraform.tfvars.example` to `terraform.tfvars` and set it. Then set the
-backend bucket or storage account you created in step 1, at the top of
-`main.tf`.
+Replace every value marked `CHANGE ME`, including the backend bucket or storage
+account you created in step 1.
 
-**AWS** needs four values: `name`, `region`, `azs` and `ingress_host`. Add
-`admin_role_arns` unless you intend nobody to have cluster admin.
+**AWS** needs `name`, `region`, `ingress_host` and `admin_role_arns`, unless you
+intend nobody to have cluster admin.
 
-**Azure** needs those plus four globally unique names Azure will not let the
-module derive: `storage_account_name`, `acr_name`, `key_vault_name` and
-`postgres_server_name`, and a `foundry` account and project name.
+**Azure** needs `subscription_id`, `name`, `ingress_host`, a `foundry` account
+and project name, and four globally unique names Azure will not let the module
+derive: `storage_account_name`, `acr_name`, `key_vault_name` and
+`postgres_server_name`.
 
 Everything else has a default. Appendix A and Appendix C list all of it.
 

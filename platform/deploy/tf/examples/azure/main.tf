@@ -1,5 +1,5 @@
-# A complete Azure deployment root. Copy this file, set the values in
-# terraform.tfvars, and apply. Nothing else has to be written.
+# A complete Azure deployment root. Copy this file, replace the values marked
+# CHANGE ME, and apply. Nothing else has to be written.
 #
 # The provider blocks stay here rather than inside the module because a module
 # that carries its own provider configuration is a legacy module: Terraform then
@@ -18,8 +18,8 @@ terraform {
 
   # The storage account comes from the one-off bootstrap in the setup guide.
   backend "azurerm" {
-    resource_group_name  = "CHANGE-ME-tfstate-rg"
-    storage_account_name = "CHANGEMEtfstate"
+    resource_group_name  = "acme-prod-tfstate-rg" # CHANGE ME
+    storage_account_name = "acmeprodtfstate"      # CHANGE ME
     container_name       = "tfstate"
     key                  = "platform.tfstate"
   }
@@ -27,7 +27,7 @@ terraform {
 
 provider "azurerm" {
   features {}
-  subscription_id = var.subscription_id
+  subscription_id = "00000000-0000-0000-0000-000000000000" # CHANGE ME
 }
 
 # AKS hands out an admin kubeconfig, so these read the cluster's own credentials
@@ -48,51 +48,21 @@ provider "helm" {
 module "roko" {
   source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.12"
 
-  name         = var.name
-  location     = var.location
-  ingress_host = var.ingress_host
+  name         = "acme-prod" # CHANGE ME
+  location     = "southcentralus"
+  ingress_host = "acme.rokolabs.ai" # CHANGE ME
 
-  storage_account_name = var.storage_account_name
-  acr_name             = var.acr_name
-  key_vault_name       = var.key_vault_name
-  postgres_server_name = var.postgres_server_name
+  # Azure makes these four globally unique, so the module cannot derive them.
+  storage_account_name = "acmeproduploads" # CHANGE ME
+  acr_name             = "acmeprodacr"     # CHANGE ME
+  key_vault_name       = "acme-prod-kv"    # CHANGE ME
+  postgres_server_name = "acme-prod-pg"    # CHANGE ME
 
-  foundry = var.foundry
-}
-
-variable "subscription_id" {
-  description = "Azure subscription to deploy into."
-  type        = string
-}
-
-variable "name" {
-  description = "Name prefix for every resource, and the resource group's name."
-  type        = string
-}
-
-variable "location" {
-  type    = string
-  default = "southcentralus"
-}
-
-variable "ingress_host" {
-  description = "Public hostname this deployment serves."
-  type        = string
-}
-
-# Azure makes these four globally unique, so they cannot be derived from `name`.
-variable "storage_account_name" { type = string }
-variable "acr_name" { type = string }
-variable "key_vault_name" { type = string }
-variable "postgres_server_name" { type = string }
-
-variable "foundry" {
-  description = "Foundry account, project and model deployments."
-  type = object({
-    account_name = string
-    project_name = string
-    location     = optional(string)
-  })
+  foundry = {
+    account_name = "acme-prod-foundry" # CHANGE ME
+    project_name = "acme-prod"         # CHANGE ME
+    location     = "eastus2"
+  }
 }
 
 # The two values Ops needs to create the DNS record, and the two a person pastes
