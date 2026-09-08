@@ -30,14 +30,19 @@ module "eks" {
   }
 
   # Never enable creator-admin: it keys an access entry off whoever runs
-  # terraform, so the entry flip-flops between the SSO role (local) and the
-  # CI role and collides with cicd's entry. Admins are explicit, via
-  # admin_role_arns, only.
+  # terraform, captured at creation, and names it in a way this module cannot
+  # address afterwards. Every principal is explicit, through
+  # admin_principal_arns, which the composed module fills with the applying
+  # identity as well as anyone the deployment names.
   enable_cluster_creator_admin_permissions = false
 
+  # Keyed by the whole ARN rather than by basename: two principals whose ARNs end
+  # in the same name would otherwise collapse into one entry, and the one that
+  # lost would silently have no access. distinct() lets a caller list the same
+  # principal twice, which happens when it merges in the identity applying it.
   access_entries = merge(
     {
-      for arn in var.admin_role_arns : "admin-${basename(arn)}" => {
+      for arn in distinct(var.admin_principal_arns) : "admin-${arn}" => {
         principal_arn = arn
         policy_associations = {
           admin = {
@@ -48,7 +53,7 @@ module "eks" {
       }
     },
     {
-      for arn in var.viewer_role_arns : "viewer-${basename(arn)}" => {
+      for arn in distinct(var.viewer_principal_arns) : "viewer-${arn}" => {
         principal_arn = arn
         policy_associations = {
           viewer = {

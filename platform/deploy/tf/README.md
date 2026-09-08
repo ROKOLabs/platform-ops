@@ -71,7 +71,7 @@ local, which is why it is separate.
 
 ```hcl
 module "tf_backend" {
-  source      = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws/tf-backend?ref=0.0.12"
+  source      = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws/tf-backend?ref=0.0.13"
   bucket_name = "acme-prod-tfstate"
 }
 ```
@@ -114,8 +114,10 @@ the file.
 Replace every value marked `CHANGE ME`, including the backend bucket or storage
 account you created in step 1.
 
-**AWS** needs `name`, `region`, `ingress_host` and `admin_role_arns`, unless you
-intend nobody to have cluster admin.
+**AWS** needs `name`, `region`, `ingress_host` and `api_allowed_cidrs`. Add
+`admin_principal_arns` for the people who need `kubectl`; the identity running
+Terraform is granted cluster admin automatically, so the apply does not depend
+on you remembering to list it.
 
 **Azure** needs `subscription_id`, `name`, `ingress_host`, a `foundry` account
 and project name, and four globally unique names Azure will not let the module
@@ -236,7 +238,7 @@ such a deployment also sets `restrict_origin_to_cloudflare = false`.
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.12"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.13"
 
   name         = "acme-prod"
   region       = "us-east-1"
@@ -265,7 +267,7 @@ module "roko" {
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.12"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.13"
 
   name         = "acme-prod"
   region       = "us-east-1"
@@ -285,7 +287,7 @@ A deployment migrating off hand-written Terraform states the names it already ha
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.12"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.13"
 
   name         = "rokolabs-dev"
   region       = "us-east-1"
@@ -317,7 +319,7 @@ The only supported override of the version constant. It changes the images, neve
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.12"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.13"
 
   name         = "rokolabs-dev"
   region       = "us-east-1"
@@ -347,7 +349,7 @@ Memory limits each node to one agent, so the node ceiling and the agent concurre
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.12"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.13"
 
   name         = "acme-prod"
   location     = "southcentralus"
@@ -379,7 +381,7 @@ module "roko" {
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.12"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.13"
 
   name         = "acme-prod"
   location     = "southcentralus"
@@ -421,8 +423,9 @@ module "roko" {
 | `public_subnet_cidrs` | list(string) | `[]` | Public subnet CIDRs, same rule. |
 | `high_availability` | bool | `false` | On runs a NAT gateway per zone and a standby database in a second zone. Off is cheaper and does not survive losing a zone. |
 | `kubernetes_version` | string | `1.36` | EKS version. Standard support runs to August 2027. |
-| `admin_role_arns` | list(string) | `[]` | Roles granted cluster admin. Use the FULL pathful ARN: EKS rejects path-stripped SSO role ARNs. |
-| `viewer_role_arns` | list(string) | `[]` | Roles granted cluster-wide read access. Same pathful-ARN rule. |
+| `admin_principal_arns` | list(string) | `[]` | Principals granted cluster admin, on top of whoever applies. Roles and users both work. Use the FULL pathful ARN: EKS rejects path-stripped SSO role ARNs. |
+| `viewer_principal_arns` | list(string) | `[]` | Principals granted cluster-wide read access. Same pathful-ARN rule. |
+| `grant_terraform_principal_admin` | bool | `true` | Grants cluster admin to the identity applying the module, resolved through its session context so an SSO role keeps its path. Turn it off only where two identities apply the same state, and list both instead. |
 
 ### TLS and origin access
 

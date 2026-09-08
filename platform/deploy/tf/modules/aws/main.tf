@@ -44,6 +44,14 @@ module "network" {
   tags                 = local.tags
 }
 
+# The ARN of whoever is applying, resolved to the IAM principal EKS wants. The
+# caller identity of an assumed role is the session
+# (arn:aws:sts::…:assumed-role/Role/session), which EKS rejects; session context
+# resolves it back to the role, keeping the path that an SSO role needs.
+data "aws_iam_session_context" "current" {
+  arn = data.aws_caller_identity.current.arn
+}
+
 module "cluster" {
   source = "./eks-cluster"
 
@@ -52,9 +60,44 @@ module "cluster" {
   vpc_id             = module.network.vpc_id
   private_subnet_ids = module.network.private_subnet_ids
   api_allowed_cidrs  = var.api_allowed_cidrs
-  admin_role_arns    = var.admin_role_arns
-  viewer_role_arns   = var.viewer_role_arns
-  tags               = local.tags
+
+  admin_principal_arns  = local.admin_principal_arns
+  viewer_principal_arns = var.viewer_principal_arns
+
+  tags = local.tags
+}
+
+locals {
+  terraform_principal_arn = data.aws_iam_session_context.current.issuer_arn
+
+  admin_principal_arns = var.grant_terraform_principal_admin ? distinct(concat(
+    var.admin_principal_arns,
+    [local.terraform_principal_arn],
+  )) : var.admin_principal_arns
+}
+
+# With the grant turned off, the failure is otherwise an Unauthorized twenty
+# minutes into an apply that has already built the cluster. This refuses the plan
+# in seconds instead, and names the ARN to add.
+#
+# A `lifecycle` precondition rather than a `check` block: a check block reports a
+# warning and exits zero, so a plan would still be applied.
+resource "terraform_data" "cluster_access_preflight" {
+  input = local.terraform_principal_arn
+
+  lifecycle {
+    precondition {
+      condition = var.grant_terraform_principal_admin || contains(
+        var.admin_principal_arns,
+        local.terraform_principal_arn,
+      )
+      error_message = join("", [
+        "grant_terraform_principal_admin is off and ",
+        local.terraform_principal_arn,
+        " is not in admin_principal_arns, so this apply would create the cluster and then fail Unauthorized on the first namespace. Add that ARN to admin_principal_arns, or turn the grant back on.",
+      ])
+    }
+  }
 }
 
 module "baseline" {

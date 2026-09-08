@@ -16,5 +16,5 @@ platform. It is public, so nothing here needs a token to fetch.
 Pin by tag. The tag is the `ROKOLabs/platform` release it deploys.
 
 ```hcl
-source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.12"
+source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.13"
 ```

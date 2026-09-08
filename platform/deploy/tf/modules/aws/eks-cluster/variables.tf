@@ -22,14 +22,14 @@ variable "api_allowed_cidrs" {
   default     = ["0.0.0.0/0"]
 }
 
-variable "admin_role_arns" {
-  description = "IAM role ARNs to grant cluster-admin. Use the FULL pathful ARN — EKS rejects path-stripped SSO role ARNs as invalid principals."
+variable "admin_principal_arns" {
+  description = "IAM principal ARNs to grant cluster-admin. Roles and users both work. Use the FULL pathful ARN — EKS rejects path-stripped SSO role ARNs as invalid principals."
   type        = list(string)
   default     = []
 }
 
-variable "viewer_role_arns" {
-  description = "IAM role ARNs to grant cluster-wide read access (AmazonEKSViewPolicy). Use the FULL pathful ARN — EKS rejects path-stripped SSO role ARNs as invalid principals."
+variable "viewer_principal_arns" {
+  description = "IAM principal ARNs to grant cluster-wide read access (AmazonEKSViewPolicy). Same pathful-ARN rule as above."
   type        = list(string)
   default     = []
 }

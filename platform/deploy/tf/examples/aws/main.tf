@@ -58,7 +58,7 @@ provider "helm" {
 }
 
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.12"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.13"
 
   name         = "acme-prod" # CHANGE ME
   region       = "us-east-1" # CHANGE ME, together with the provider above
@@ -78,8 +78,10 @@ module "roko" {
   # cheaper and does not survive losing a zone.
   high_availability = false
 
-  # The FULL pathful ARN. EKS rejects a path-stripped SSO role ARN.
-  admin_role_arns = [
+  # Who else gets cluster admin. The identity running Terraform is granted it
+  # automatically, so this is for the people who need kubectl. Use the FULL
+  # pathful ARN: EKS rejects a path-stripped SSO role ARN.
+  admin_principal_arns = [
     "arn:aws:iam::111122223333:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_abc123", # CHANGE ME
   ]
 

@@ -57,16 +57,22 @@ variable "kubernetes_version" {
   default     = "1.36"
 }
 
-variable "admin_role_arns" {
-  description = "IAM role ARNs granted cluster admin. Use the FULL pathful ARN: EKS rejects path-stripped SSO role ARNs as invalid principals."
+variable "admin_principal_arns" {
+  description = "IAM principal ARNs granted cluster admin, in addition to whoever applies this module. Roles and users both work. Use the FULL pathful ARN: EKS rejects path-stripped SSO role ARNs as invalid principals."
   type        = list(string)
   default     = []
 }
 
-variable "viewer_role_arns" {
-  description = "IAM role ARNs granted cluster-wide read access. Same pathful-ARN rule as above."
+variable "viewer_principal_arns" {
+  description = "IAM principal ARNs granted cluster-wide read access. Same pathful-ARN rule as above."
   type        = list(string)
   default     = []
+}
+
+variable "grant_terraform_principal_admin" {
+  description = "Grant cluster admin to the identity applying this module. Terraform reaches the cluster through the same endpoint it just created, so without access of its own the apply builds the network, the cluster and the database and then fails Unauthorized on the first namespace. Turn it off only where two identities apply the same state, because the entry then follows whichever one applied last and every apply shows a diff; list them both in `admin_principal_arns` instead."
+  type        = bool
+  default     = true
 }
 
 # ── TLS ──────────────────────────────────────────────────────────────────────

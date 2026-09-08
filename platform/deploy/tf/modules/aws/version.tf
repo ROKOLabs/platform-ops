@@ -8,5 +8,5 @@
 # `?ref=X.Y.Z` can never get the infrastructure of one release and the images of
 # another. Changing this value and pushing the matching tag is what a release is.
 locals {
-  platform_version = "0.0.12"
+  platform_version = "0.0.13"
 }
