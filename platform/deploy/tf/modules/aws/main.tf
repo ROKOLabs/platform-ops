@@ -117,8 +117,11 @@ resource "aws_security_group" "db" {
 }
 
 resource "aws_vpc_security_group_ingress_rule" "db_from_cluster" {
-  security_group_id            = aws_security_group.db.id
-  referenced_security_group_id = module.cluster.cluster_security_group_id
+  security_group_id = aws_security_group.db.id
+  # The EKS-managed group, not the module-created `cluster_security_group_id`.
+  # Only this one is attached to nodes; allowing the other admits nothing and
+  # every pod fails to reach Postgres.
+  referenced_security_group_id = module.cluster.cluster_primary_security_group_id
   from_port                    = 5432
   to_port                      = 5432
   ip_protocol                  = "tcp"

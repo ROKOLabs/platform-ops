@@ -245,15 +245,14 @@ module "roko" {
   azs          = ["us-east-1a", "us-east-1b", "us-east-1c"]
   ingress_host = "acme.rokolabs.ai"
 
-  # One NAT gateway per zone, so losing a zone does not take egress with it.
-  single_nat_gateway = false
+  # A NAT gateway per zone and a standby database in a second zone.
+  high_availability = true
 
   # Reach the API server from the office range only.
   api_allowed_cidrs = ["203.0.113.0/24"]
 
   db_instance_class        = "db.m7g.large"
   db_allocated_storage     = 200
-  db_multi_az              = true
   db_backup_retention_days = 30
 
   monthly_budget_usd   = 5000
@@ -410,7 +409,7 @@ module "roko" {
 | --- | --- | --- |
 | `name` | string | Name prefix for every resource, for example `acme-prod`. Also the default stem of every bucket, repository and IAM role name. |
 | `region` | string | AWS region. Must match the region the calling provider is configured for. |
-| `azs` | list(string) | Availability zones. One private `/20` and one public `/24` subnet per zone. |
+| `azs` | list(string) | Availability zones. One private and one public subnet per zone, sized from `vpc_cidr`. Three rather than two: a zone is also where compute comes from, and in a constrained region the third is often what gets a node provisioned. |
 | `ingress_host` | string | Public hostname the platform serves, for example `acme.rokolabs.ai`. Names the Ingress host rule and the origin certificate. |
 | `api_allowed_cidrs` | list(string) | Who may reach the EKS public API endpoint. No default: an open control plane should be a decision. Terraform reaches the cluster through it, so the address applying the module has to be listed. |
 
@@ -421,7 +420,7 @@ module "roko" {
 | `vpc_cidr` | string | `10.0.0.0/20` | VPC range. Cannot be changed after creation. A /20 gives each zone a /22 for pods and a /24 for load balancers. |
 | `private_subnet_cidrs` | list(string) | `[]` | Private subnet CIDRs, one per zone, in the order of `azs`. Empty derives them from `vpc_cidr`. Set them only to match subnets that already exist. |
 | `public_subnet_cidrs` | list(string) | `[]` | Public subnet CIDRs, same rule. |
-| `high_availability` | bool | `false` | On runs a NAT gateway per zone and a standby database in a second zone. Off is cheaper and does not survive losing a zone. |
+| `high_availability` | bool | `false` | On runs a NAT gateway per zone and a standby database in a second zone. Off shares one NAT gateway and runs a single database. It decides what is duplicated across the zones in `azs`; it does not change how many zones there are. |
 | `kubernetes_version` | string | `1.36` | EKS version. Standard support runs to August 2027. |
 | `admin_principal_arns` | list(string) | `[]` | Principals granted cluster admin, on top of whoever applies. Roles and users both work. Use the FULL pathful ARN: EKS rejects path-stripped SSO role ARNs. |
 | `viewer_principal_arns` | list(string) | `[]` | Principals granted cluster-wide read access. Same pathful-ARN rule. |

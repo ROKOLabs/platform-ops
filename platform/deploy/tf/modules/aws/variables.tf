@@ -39,7 +39,7 @@ variable "public_subnet_cidrs" {
 }
 
 variable "azs" {
-  description = "Availability zones. One private /20 and one public /24 subnet are created per zone."
+  description = "Availability zones. One private and one public subnet are created per zone, sized from `vpc_cidr`. Three is the sensible floor rather than two: a zone is also where compute comes from, and in a constrained region a third zone is often the difference between a node being provisioned and a pod staying Pending. It is independent of `high_availability`, which decides what is duplicated across the zones you list."
   type        = list(string)
 }
 

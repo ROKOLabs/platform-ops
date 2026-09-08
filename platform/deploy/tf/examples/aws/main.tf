@@ -62,7 +62,7 @@ module "roko" {
 
   name         = "acme-prod" # CHANGE ME
   region       = "us-east-1" # CHANGE ME, together with the provider above
-  azs          = ["us-east-1a", "us-east-1b"]
+  azs          = ["us-east-1a", "us-east-1b", "us-east-1c"]
   ingress_host = "acme.rokolabs.ai" # CHANGE ME
 
   # A /22 per zone for pods and a /24 per zone for load balancers. Widen it only
