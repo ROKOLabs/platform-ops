@@ -54,4 +54,12 @@ resource "helm_release" "external_secrets" {
       type  = "string"
     },
   ]
+
+  # The platform chart applies a SecretStore and two ExternalSecrets the moment
+  # this release is done, so a half-installed operator surfaces as CRDs that do
+  # not exist yet, several resources later.
+  timeout         = 600
+  wait            = true
+  atomic          = true
+  cleanup_on_fail = true
 }

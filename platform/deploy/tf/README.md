@@ -136,6 +136,11 @@ ordered by dependencies rather than by a person: the network, then the cluster,
 then External Secrets Operator, then the platform. Run it again with no input
 changes and the plan is empty.
 
+It either finishes with a deployment that serves traffic or it fails. Helm waits
+for every workload to be ready and rolls the release back if any of them is not,
+and the apply then waits for the load balancer itself, so a successful apply
+leaves nothing half-installed and no output empty.
+
 While it runs, this is what Terraform generates so that nobody has to:
 
 | Secret | Where it goes |
@@ -405,6 +410,7 @@ module "roko" {
 | `region` | string | AWS region. Must match the region the calling provider is configured for. |
 | `azs` | list(string) | Availability zones. One private `/20` and one public `/24` subnet per zone. |
 | `ingress_host` | string | Public hostname the platform serves, for example `acme.rokolabs.ai`. Names the Ingress host rule and the origin certificate. |
+| `api_allowed_cidrs` | list(string) | Who may reach the EKS public API endpoint. No default: an open control plane should be a decision. Terraform reaches the cluster through it, so the address applying the module has to be listed. |
 
 ### Network and cluster
 
@@ -413,9 +419,8 @@ module "roko" {
 | `vpc_cidr` | string | `10.0.0.0/20` | VPC range. Cannot be changed after creation. A /20 gives each zone a /22 for pods and a /24 for load balancers. |
 | `private_subnet_cidrs` | list(string) | `[]` | Private subnet CIDRs, one per zone, in the order of `azs`. Empty derives them from `vpc_cidr`. Set them only to match subnets that already exist. |
 | `public_subnet_cidrs` | list(string) | `[]` | Public subnet CIDRs, same rule. |
-| `single_nat_gateway` | bool | `true` | `true` shares one NAT gateway across every zone. `false` creates one per zone. |
-| `kubernetes_version` | string | `1.34` | EKS version. |
-| `api_allowed_cidrs` | list(string) | `["0.0.0.0/0"]` | Who may reach the EKS public API endpoint. |
+| `high_availability` | bool | `false` | On runs a NAT gateway per zone and a standby database in a second zone. Off is cheaper and does not survive losing a zone. |
+| `kubernetes_version` | string | `1.36` | EKS version. Standard support runs to August 2027. |
 | `admin_role_arns` | list(string) | `[]` | Roles granted cluster admin. Use the FULL pathful ARN: EKS rejects path-stripped SSO role ARNs. |
 | `viewer_role_arns` | list(string) | `[]` | Roles granted cluster-wide read access. Same pathful-ARN rule. |
 
@@ -434,7 +439,8 @@ module "roko" {
 | --- | --- | --- | --- |
 | `db_instance_class` | string | `db.t4g.micro` | Postgres instance class. |
 | `db_allocated_storage` | number | `20` | Storage in GiB. |
-| `db_multi_az` | bool | `false` | Runs a standby in a second zone. |
+| `db_engine_version` | string | `17` | Postgres major version, or a full minor version to pin one. |
+| `db_apply_immediately` | bool | `false` | `true` applies an instance class, storage or credential change at once, with the reboot that implies, instead of in the maintenance window. |
 | `db_backup_retention_days` | number | `7` | Automated backup retention. |
 | `db_deletion_protection` | bool | `true` | Refuses to destroy the instance until turned off and applied. |
 
@@ -484,7 +490,7 @@ Every name defaults to one derived from `name`, which is what a new deployment w
 | `db_host` | Postgres endpoint. |
 | `uploads_bucket`, `checkpoints_bucket` | Object storage the Artifacts, Prototypes and agent features use. |
 | `hostname` | The name this deployment serves, echoed back, so Ops knows the record to create. |
-| `ingress_hostname` | The load balancer address that record points at. |
+| `ingress_hostname` | The load balancer address that record points at. The apply waits for it, so it is never empty on a successful apply. |
 | `tls_secret_id` | The certificate the load balancer serves. Null unless `tls_mode` is `provided`. |
 | `origin_allowed_cidrs` | The Cloudflare ranges this apply allowed, as `{ipv4, ipv6}`, so drift is visible in a plan. |
 | `platform_version` | The release this module deploys. |
@@ -501,6 +507,7 @@ The same shape with Azure's own names. Four names are required rather than deriv
 | `name` | string | Name prefix for every resource, and the resource group's name. |
 | `location` | string | Azure region. |
 | `ingress_host` | string | Public hostname the platform serves. |
+| `api_allowed_cidrs` | list(string) | Who may reach the AKS public API server. No default, for the same reason as AWS. |
 | `storage_account_name` | string | Uploads storage account. Globally unique, 3-24 lowercase alphanumerics. |
 | `acr_name` | string | Container registry. Globally unique, 5-50 alphanumerics. |
 | `key_vault_name` | string | Key Vault. Globally unique, 3-24 alphanumerics and hyphens. |
@@ -515,7 +522,6 @@ The same shape with Azure's own names. Four names are required rather than deriv
 | `aks_subnet_cidr` | string | `""` | Subnet for AKS nodes and pods. Empty derives it from `vnet_cidr`. Set it only to match a subnet that already exists. |
 | `postgres_subnet_cidr` | string | `""` | Delegated subnet for the Flexible Server, same rule. |
 | `kubernetes_version` | string | `1.36` | AKS version. |
-| `api_allowed_cidrs` | list(string) | `[]` | Who may reach the AKS public API server. Empty means open. |
 | `agent_node_vm_size` | string | `Standard_D4s_v5` | VM size for the autoscaling agent pool. A D4s_v5 has room for one three-CPU agent Job plus the AKS DaemonSets. |
 | `agent_node_min_count` | number | `1` | Warm agent nodes. |
 | `agent_node_max_count` | number | `3` | Autoscale ceiling. Memory limits each node to one agent, so this is also the agent concurrency cap. |
@@ -579,7 +585,7 @@ The names match `modules/aws` wherever the thing behind them matches, so a calle
 | `db_host` | Postgres FQDN. The pod reads the whole URL from Key Vault; this is for a person connecting by hand. |
 | `uploads_bucket`, `checkpoints_bucket` | The two Blob containers. |
 | `hostname` | The name this deployment serves. |
-| `ingress_hostname` | The controller's load balancer IP. On Azure the record is an `A`, not a `CNAME`. |
+| `ingress_hostname` | The controller's load balancer IP. On Azure the record is an `A`, not a `CNAME`. The apply waits for it. |
 | `tls_secret_id` | The Secret to drop a certificate into. Null unless `tls_mode` is `provided`. |
 | `origin_allowed_cidrs` | The Cloudflare ranges this apply allowed. |
 | `platform_version` | The release this module deploys. |

@@ -56,6 +56,10 @@ module "roko" {
   # the VNet is created.
   vnet_cidr = "10.0.0.0/20"
 
+  # Who may reach the Kubernetes API server. Terraform reaches it too, so the
+  # address running this has to be in the list.
+  api_allowed_cidrs = ["203.0.113.0/24"] # CHANGE ME
+
   # Azure makes these four globally unique, so the module cannot derive them.
   storage_account_name = "acmeproduploads" # CHANGE ME
   acr_name             = "acmeprodacr"     # CHANGE ME

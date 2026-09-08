@@ -42,7 +42,7 @@ output "hostname" {
 
 output "ingress_hostname" {
   description = "Load balancer address Roko points its proxied Cloudflare record at. On Azure it is a static IP, so the record is an A. Null until the controller's Service has been given one."
-  value       = try(data.kubernetes_service_v1.ingress_nginx.status[0].load_balancer[0].ingress[0].ip, null)
+  value       = data.kubernetes_service_v1.ingress_nginx.status[0].load_balancer[0].ingress[0].ip
 }
 
 output "tls_secret_id" {
@@ -78,8 +78,8 @@ output "foundry_gpt_deployment_name" {
   value       = module.foundry.gpt_deployment_name
 }
 
-# The address belongs to the controller's Service, which Helm created, so it is
-# read back out of the cluster after the release.
+# The address belongs to the controller's Service, which Helm created and waited
+# for, so this read always finds one.
 data "kubernetes_service_v1" "ingress_nginx" {
   metadata {
     name      = "ingress-nginx-controller"

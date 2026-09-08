@@ -70,6 +70,14 @@ module "roko" {
   # after the VPC is created.
   vpc_cidr = "10.0.0.0/20"
 
+  # Who may reach the Kubernetes API server. Terraform reaches it too, so the
+  # address running this has to be in the list.
+  api_allowed_cidrs = ["203.0.113.0/24"] # CHANGE ME
+
+  # A NAT gateway per zone and a standby database in a second zone. Off is
+  # cheaper and does not survive losing a zone.
+  high_availability = false
+
   # The FULL pathful ARN. EKS rejects a path-stripped SSO role ARN.
   admin_role_arns = [
     "arn:aws:iam::111122223333:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_abc123", # CHANGE ME

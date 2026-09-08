@@ -40,9 +40,8 @@ variable "kubernetes_version" {
 }
 
 variable "api_allowed_cidrs" {
-  description = "CIDRs allowed to reach the AKS public API server. Empty means open."
+  description = "CIDRs allowed to reach the AKS public API server. Required, with no default, because the only safe default is the one somebody chose. Terraform itself reaches the cluster through this endpoint, so the address applying this module has to be in the list."
   type        = list(string)
-  default     = []
 }
 
 variable "agent_node_vm_size" {

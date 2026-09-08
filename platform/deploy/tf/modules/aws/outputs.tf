@@ -35,8 +35,8 @@ output "hostname" {
 }
 
 output "ingress_hostname" {
-  description = "Load balancer address Roko points its proxied Cloudflare record at. Null until the chart's Ingress has been given one."
-  value       = try(data.kubernetes_ingress_v1.platform.status[0].load_balancer[0].ingress[0].hostname, null)
+  description = "Load balancer address Roko points its proxied Cloudflare record at. The apply waits for it, so it is never empty on a successful apply."
+  value       = data.aws_lb.platform.dns_name
 }
 
 output "tls_secret_id" {
@@ -72,15 +72,43 @@ output "agent_ecr_repository_url" {
   value       = module.agent_ecr.repository_url
 }
 
-# The load balancer is created by the chart's Ingress, not by Terraform, so its
-# address is read back out of the cluster once Helm has applied. `try` above
-# covers the window between the release completing and the controller filling in
-# the status, where the field is genuinely absent rather than merely unknown.
-data "kubernetes_ingress_v1" "platform" {
-  metadata {
-    name      = "roko-platform"
-    namespace = kubernetes_namespace_v1.service.metadata[0].name
+# The load balancer is created by the chart's Ingress, not by Terraform, and Helm
+# does not wait for an Ingress: `wait` covers Deployments, Pods and
+# LoadBalancer Services, and returns as soon as the pods are ready, which is
+# minutes before the controller has finished provisioning the ALB. So a bare
+# lookup here would fail the apply, and the address would be missing from the
+# outputs the DNS record is created from.
+#
+# This polls for it with the same `aws` CLI the Kubernetes provider already
+# needs, then reads it. The tags are what EKS Auto Mode's controller stamps on
+# every load balancer it creates for an Ingress.
+resource "terraform_data" "wait_for_load_balancer" {
+  triggers_replace = [helm_release.platform.id]
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/sh", "-c"]
+    command     = <<-EOT
+      set -eu
+      for attempt in $(seq 1 60); do
+        found=$(aws resourcegroupstaggingapi get-resources           --region '${var.region}'           --resource-type-filters elasticloadbalancing:loadbalancer           --tag-filters 'Key=eks:eks-cluster-name,Values=${module.cluster.cluster_name}'                         'Key=ingress.eks.amazonaws.com/stack,Values=${kubernetes_namespace_v1.service.metadata[0].name}/roko-platform'           --query 'length(ResourceTagMappingList)' --output text)
+        if [ "$found" -gt 0 ]; then
+          echo "Load balancer ready after $attempt attempt(s)."
+          exit 0
+        fi
+        sleep 10
+      done
+      echo "The load balancer did not appear within 10 minutes. Check the roko-platform Ingress in the service namespace." >&2
+      exit 1
+    EOT
+  }
+}
+
+data "aws_lb" "platform" {
+  tags = {
+    "eks:eks-cluster-name"               = module.cluster.cluster_name
+    "ingress.eks.amazonaws.com/stack"    = "${kubernetes_namespace_v1.service.metadata[0].name}/roko-platform"
+    "ingress.eks.amazonaws.com/resource" = "LoadBalancer"
   }
 
-  depends_on = [helm_release.platform]
+  depends_on = [terraform_data.wait_for_load_balancer]
 }

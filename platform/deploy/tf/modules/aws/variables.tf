@@ -13,6 +13,11 @@ variable "ingress_host" {
   type        = string
 }
 
+variable "api_allowed_cidrs" {
+  description = "CIDRs allowed to reach the EKS public API endpoint. Required, with no default, because the only safe default is the one somebody chose: an open control plane is a decision, not an accident. Terraform itself reaches the cluster through this endpoint, so the address applying this module has to be in the list."
+  type        = list(string)
+}
+
 # ── Network ──────────────────────────────────────────────────────────────────
 
 variable "vpc_cidr" {
@@ -38,24 +43,18 @@ variable "azs" {
   type        = list(string)
 }
 
-variable "single_nat_gateway" {
-  description = "true shares one NAT gateway across every zone (cheap, a single point of failure). false creates one per zone."
+variable "high_availability" {
+  description = "One switch for the two places a deployment trades cost against surviving the loss of a zone: on runs a NAT gateway per zone rather than one shared, and a standby database in a second zone. Off is the default because losing a zone is rare and both cost real money every month; turn it on for a deployment whose downtime costs more than the standby does."
   type        = bool
-  default     = true
+  default     = false
 }
 
 # ── Cluster access ───────────────────────────────────────────────────────────
 
 variable "kubernetes_version" {
-  description = "EKS Kubernetes version."
+  description = "EKS Kubernetes version. 1.36 leaves standard support in August 2027; a version already near its end date puts a deployment into an upgrade or into extended-support pricing shortly after it is created."
   type        = string
-  default     = "1.34"
-}
-
-variable "api_allowed_cidrs" {
-  description = "CIDRs allowed to reach the EKS public API endpoint."
-  type        = list(string)
-  default     = ["0.0.0.0/0"]
+  default     = "1.36"
 }
 
 variable "admin_role_arns" {
@@ -120,8 +119,14 @@ variable "db_allocated_storage" {
   default     = 20
 }
 
-variable "db_multi_az" {
-  description = "true runs a standby in a second zone."
+variable "db_engine_version" {
+  description = "Postgres major version, or a full minor version to pin one. AWS resolves a major to its current minor and keeps it there through the maintenance window."
+  type        = string
+  default     = "17"
+}
+
+variable "db_apply_immediately" {
+  description = "false applies an instance class, storage or credential change in the next maintenance window. true applies it at once, with the reboot that implies, which is what a deployment nobody depends on wants and a deployment somebody depends on does not."
   type        = bool
   default     = false
 }

@@ -285,6 +285,14 @@ resource "helm_release" "ingress_nginx" {
       }
     }
   })]
+
+  # Helm waits for a LoadBalancer Service to be given an address, so this release
+  # does not return until the ingress controller has a public IP. That is what
+  # makes the ingress_hostname output reliable on the first apply.
+  timeout         = 900
+  wait            = true
+  atomic          = true
+  cleanup_on_fail = true
 }
 
 # ── The platform itself ──────────────────────────────────────────────────────
@@ -392,6 +400,19 @@ resource "helm_release" "platform" {
     yamlencode(local.platform_values),
     yamlencode(var.chart_values),
   ]
+
+  # Helm's default is 300 seconds, and a first install spends most of that
+  # pulling images and booting the API before a pod is ready. Timing out there
+  # fails an apply in which everything else succeeded.
+  timeout = 900
+
+  # Wait for every workload to be ready, and undo the release if any of them is
+  # not. Without atomic, a chart that half-installs leaves a broken release
+  # behind and reports success, and the next apply plans against it.
+  wait            = true
+  wait_for_jobs   = true
+  atomic          = true
+  cleanup_on_fail = true
 
   # The chart templates a SecretStore and two ExternalSecrets, so the operator's
   # CRDs have to be registered before Helm applies them.

@@ -40,7 +40,7 @@ module "network" {
   azs                  = var.azs
   private_subnet_cidrs = var.private_subnet_cidrs
   public_subnet_cidrs  = var.public_subnet_cidrs
-  single_nat_gateway   = var.single_nat_gateway
+  single_nat_gateway   = !var.high_availability
   tags                 = local.tags
 }
 
@@ -102,10 +102,12 @@ resource "random_password" "db_master" {
   override_special = "!$^&*()-_=+[]{}:."
 }
 
+resource "time_static" "db" {}
+
 resource "aws_db_instance" "platform" {
   identifier     = "${var.name}-platform"
   engine         = "postgres"
-  engine_version = "17"
+  engine_version = var.db_engine_version
   instance_class = var.db_instance_class
 
   allocated_storage = var.db_allocated_storage
@@ -115,19 +117,22 @@ resource "aws_db_instance" "platform" {
   db_name           = "platform"
   username          = "roko"
   password          = random_password.db_master.result
-  apply_immediately = true
+  apply_immediately = var.db_apply_immediately
 
   db_subnet_group_name   = aws_db_subnet_group.db.name
   vpc_security_group_ids = [aws_security_group.db.id]
   publicly_accessible    = false
 
-  multi_az                = var.db_multi_az
+  multi_az                = var.high_availability
   backup_retention_period = var.db_backup_retention_days
   copy_tags_to_snapshot   = true
 
-  deletion_protection       = var.db_deletion_protection
-  skip_final_snapshot       = false
-  final_snapshot_identifier = "${var.name}-platform-final"
+  deletion_protection = var.db_deletion_protection
+  skip_final_snapshot = false
+  # Stamped with the instance's creation time. A fixed name works once: RDS keeps
+  # the snapshot after the instance is gone, so the next destroy of a
+  # same-named deployment is refused because that identifier is taken.
+  final_snapshot_identifier = "${var.name}-platform-final-${formatdate("YYYYMMDDhhmmss", time_static.db.rfc3339)}"
 
   tags = local.tags
 }
@@ -661,6 +666,20 @@ resource "helm_release" "platform" {
     yamlencode(local.platform_values),
     yamlencode(var.chart_values),
   ]
+
+  # Helm's default is 300 seconds, and a first install spends most of that before
+  # a pod starts: Karpenter provisions a node, then three images are pulled, then
+  # the API boots and migrates. Timing out there fails an apply in which
+  # everything else succeeded.
+  timeout = 900
+
+  # Wait for every workload to be ready, and undo the release if any of them is
+  # not. Without atomic, a chart that half-installs leaves a broken release
+  # behind and reports success, and the next apply plans against it.
+  wait            = true
+  wait_for_jobs   = true
+  atomic          = true
+  cleanup_on_fail = true
 
   # The chart templates a SecretStore and two ExternalSecrets, so the operator's
   # CRDs have to be registered before Helm applies them. That edge is not

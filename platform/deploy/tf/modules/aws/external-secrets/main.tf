@@ -12,6 +12,15 @@ resource "helm_release" "this" {
   repository = "https://charts.external-secrets.io"
   chart      = "external-secrets"
   version    = var.chart_version
+
+  # The platform chart applies a SecretStore and two ExternalSecrets the moment
+  # this release is done, so a half-installed operator surfaces as CRDs that do
+  # not exist yet, several resources later. Wait for the controller and the
+  # webhook, and roll back rather than leave a broken release behind.
+  timeout         = 600
+  wait            = true
+  atomic          = true
+  cleanup_on_fail = true
 }
 
 data "aws_iam_policy_document" "assume" {
