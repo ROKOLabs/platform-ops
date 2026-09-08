@@ -14,7 +14,7 @@ variable "resource_group_name" {
 variable "address_space" {
   description = "VNet CIDR. CANNOT be changed after creation."
   type        = string
-  default     = "10.0.0.0/22"
+  default     = "10.0.0.0/20"
 }
 
 variable "aks_subnet_prefix" {

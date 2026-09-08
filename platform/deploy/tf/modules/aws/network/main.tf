@@ -6,9 +6,8 @@ locals {
   # load balancers and the NAT gateway, so they take an eighth and sit at the top
   # of the range, leaving the middle free to grow into.
   #
-  # On the default /22 with two zones that is a /24 per zone for pods and a /26
-  # per zone for load balancers. Three zones on a /22 still works, at a /25 and a
-  # /27; a deployment wanting three large zones should widen the CIDR instead.
+  # On the default /20 with two zones that is a /22 per zone for pods and a /24
+  # per zone for load balancers. Three zones give a /23 and a /24.
   derived_private_subnets = [for i, az in var.azs : cidrsubnet(var.cidr, local.zone_bits + 1, i)]
   derived_public_subnets  = [for i, az in var.azs : cidrsubnet(var.cidr, local.zone_bits + 3, pow(2, local.zone_bits + 3) - length(var.azs) + i)]
 

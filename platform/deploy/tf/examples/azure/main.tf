@@ -52,9 +52,9 @@ module "roko" {
   location     = "southcentralus"
   ingress_host = "acme.rokolabs.ai" # CHANGE ME
 
-  # A /23 for AKS nodes and pods and a /26 for Postgres. Cannot be changed after
+  # A /21 for AKS nodes and pods and a /24 for Postgres. Cannot be changed after
   # the VNet is created.
-  vnet_cidr = "10.0.0.0/22"
+  vnet_cidr = "10.0.0.0/20"
 
   # Azure makes these four globally unique, so the module cannot derive them.
   storage_account_name = "acmeproduploads" # CHANGE ME

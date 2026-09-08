@@ -16,9 +16,9 @@ variable "ingress_host" {
 # ── Network and cluster ──────────────────────────────────────────────────────
 
 variable "vnet_cidr" {
-  description = "VNet address space. CANNOT be changed after creation. A /22 gives AKS a /23 for nodes and pods and Postgres a /26; widen it only for a deployment that will run much more in the cluster."
+  description = "VNet address space. CANNOT be changed after creation. A /20 gives AKS a /21 for nodes and pods and Postgres a /24; widen it only for a deployment that will run much more in the cluster."
   type        = string
-  default     = "10.0.0.0/22"
+  default     = "10.0.0.0/20"
 }
 
 variable "aks_subnet_cidr" {

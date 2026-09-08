@@ -5,7 +5,7 @@ variable "name" {
 variable "cidr" {
   description = "VPC CIDR. CANNOT be changed after creation."
   type        = string
-  default     = "10.0.0.0/22"
+  default     = "10.0.0.0/20"
 }
 
 variable "private_subnet_cidrs" {

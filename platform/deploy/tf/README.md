@@ -8,6 +8,47 @@ and the Helm release that runs the platform. There is no second apply, no
 Pick the cloud you are deploying to and follow the steps in order. Everything
 you can set is in the appendices.
 
+```mermaid
+flowchart LR
+  browser([Browser]) --> cf[Cloudflare]
+
+  subgraph apply["One terraform apply"]
+    direction TB
+    lb[Load balancer]
+
+    subgraph cluster["Kubernetes cluster"]
+      direction TB
+      subgraph service["namespace: service"]
+        direction TB
+        ingress[Ingress] --> api[roko-api]
+        ingress --> web[roko-web]
+      end
+      subgraph agents["namespace: agents"]
+        jobs[agent Jobs]
+      end
+      eso[External Secrets Operator]
+    end
+
+    pg[(Postgres)]
+    uploads[(Uploads)]
+    checkpoints[(Checkpoints)]
+    secrets[Secret store]
+    registry[(Container registry)]
+  end
+
+  cf --> lb
+  lb --> ingress
+  api --> pg
+  api --> uploads
+  api -- launches --> jobs
+  jobs --> checkpoints
+  secrets --> eso
+  eso -- database credential, encryption key --> api
+```
+
+Everything inside the box is one module and one state. Cloudflare is the only
+piece Terraform does not create: you add one record to it at the end.
+
 ## Before you start
 
 | | |
@@ -369,7 +410,7 @@ module "roko" {
 
 | Input | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `vpc_cidr` | string | `10.0.0.0/22` | VPC range. Cannot be changed after creation. A /22 gives each zone a /24 for pods and a /26 for load balancers. |
+| `vpc_cidr` | string | `10.0.0.0/20` | VPC range. Cannot be changed after creation. A /20 gives each zone a /22 for pods and a /24 for load balancers. |
 | `private_subnet_cidrs` | list(string) | `[]` | Private subnet CIDRs, one per zone, in the order of `azs`. Empty derives them from `vpc_cidr`. Set them only to match subnets that already exist. |
 | `public_subnet_cidrs` | list(string) | `[]` | Public subnet CIDRs, same rule. |
 | `single_nat_gateway` | bool | `true` | `true` shares one NAT gateway across every zone. `false` creates one per zone. |
@@ -470,7 +511,7 @@ The same shape with Azure's own names. Four names are required rather than deriv
 
 | Input | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `vnet_cidr` | string | `10.0.0.0/22` | VNet address space. Cannot be changed after creation. A /22 gives AKS a /23 and Postgres a /26. |
+| `vnet_cidr` | string | `10.0.0.0/20` | VNet address space. Cannot be changed after creation. A /20 gives AKS a /21 and Postgres a /24. |
 | `aks_subnet_cidr` | string | `""` | Subnet for AKS nodes and pods. Empty derives it from `vnet_cidr`. Set it only to match a subnet that already exists. |
 | `postgres_subnet_cidr` | string | `""` | Delegated subnet for the Flexible Server, same rule. |
 | `kubernetes_version` | string | `1.36` | AKS version. |
