@@ -18,6 +18,14 @@ locals {
   # Empty `image_tag` means the release this module is. Only a lane that builds
   # its own images sets it (Roko's dev deployment, at a `sha-` tag).
   image_tag = var.image_tag != "" ? var.image_tag : local.platform_version
+
+  uploads_bucket     = var.uploads_bucket_name != "" ? var.uploads_bucket_name : "${var.name}-uploads"
+  checkpoints_bucket = var.checkpoints_bucket_name != "" ? var.checkpoints_bucket_name : "${var.name}-agent-checkpoints"
+
+  ecr_repositories = {
+    for image in ["api", "web", "agent"] :
+    image => coalesce(lookup(var.ecr_repository_names, image, null), "${var.name}-${image}")
+  }
 }
 
 data "aws_caller_identity" "current" {}
@@ -38,6 +46,7 @@ module "cluster" {
   source = "./eks-cluster"
 
   name               = var.name
+  kubernetes_version = var.kubernetes_version
   vpc_id             = module.network.vpc_id
   private_subnet_ids = module.network.private_subnet_ids
   api_allowed_cidrs  = var.api_allowed_cidrs
@@ -167,7 +176,7 @@ resource "aws_secretsmanager_secret_version" "secret_encryption" {
 # ── Object storage ───────────────────────────────────────────────────────────
 
 resource "aws_s3_bucket" "uploads" {
-  bucket = "${var.name}-uploads"
+  bucket = local.uploads_bucket
   tags   = local.tags
 }
 
@@ -227,7 +236,7 @@ resource "aws_s3_bucket_cors_configuration" "uploads" {
 # which can echo a token — so this bucket is encrypted, never public, and its
 # objects are short-lived by policy as well as by the backend deleting them.
 resource "aws_s3_bucket" "checkpoints" {
-  bucket = "${var.name}-agent-checkpoints"
+  bucket = local.checkpoints_bucket
   tags   = local.tags
 }
 
@@ -276,17 +285,17 @@ resource "aws_s3_bucket_lifecycle_configuration" "checkpoints" {
 
 module "api_ecr" {
   source = "./ecr-repo"
-  name   = "${var.name}-api"
+  name   = local.ecr_repositories.api
 }
 
 module "web_ecr" {
   source = "./ecr-repo"
-  name   = "${var.name}-web"
+  name   = local.ecr_repositories.web
 }
 
 module "agent_ecr" {
   source = "./ecr-repo"
-  name   = "${var.name}-agent"
+  name   = local.ecr_repositories.agent
 }
 
 # ── Workload identity ────────────────────────────────────────────────────────

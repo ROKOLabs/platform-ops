@@ -1,0 +1,16 @@
+subscription_id = "00000000-0000-0000-0000-000000000000"
+
+name         = "acme-prod"
+location     = "southcentralus"
+ingress_host = "acme.rokolabs.ai"
+
+storage_account_name = "acmeproduploads"
+acr_name             = "acmeprodacr"
+key_vault_name       = "acme-prod-kv"
+postgres_server_name = "acme-prod-pg"
+
+foundry = {
+  account_name = "acme-prod-foundry"
+  project_name = "acme-prod"
+  location     = "eastus2"
+}

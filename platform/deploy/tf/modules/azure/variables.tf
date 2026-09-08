@@ -134,6 +134,25 @@ variable "chart_values" {
   default     = {}
 }
 
+# ── Container names ──────────────────────────────────────────────────────────
+#
+# The account, registry, vault and server names above are required because they
+# are globally unique. These two are not, so they default, and are overridable
+# for the same reason as their AWS counterparts: a deployment adopting a
+# container that already holds objects has to be able to name it.
+
+variable "uploads_container_name" {
+  description = "Blob container shared by artifacts and prototypes."
+  type        = string
+  default     = "uploads"
+}
+
+variable "checkpoints_container_name" {
+  description = "Private Blob container for agent checkpoint archives."
+  type        = string
+  default     = "agent-checkpoints"
+}
+
 variable "artifact_cors_origins" {
   description = "Browser origins allowed to PUT/GET the uploads container through SAS URLs. Empty means the deployment's own `https://<ingress_host>` alone."
   type        = list(string)

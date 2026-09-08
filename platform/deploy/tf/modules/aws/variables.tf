@@ -34,6 +34,12 @@ variable "single_nat_gateway" {
 
 # ── Cluster access ───────────────────────────────────────────────────────────
 
+variable "kubernetes_version" {
+  description = "EKS Kubernetes version."
+  type        = string
+  default     = "1.34"
+}
+
 variable "api_allowed_cidrs" {
   description = "CIDRs allowed to reach the EKS public API endpoint."
   type        = list(string)
@@ -148,6 +154,36 @@ variable "chart_values" {
   description = "Chart values merged over the values the module computes. The merge is deep, so overriding one nested key leaves its siblings in place."
   type        = any
   default     = {}
+}
+
+# ── Names ────────────────────────────────────────────────────────────────────
+#
+# Every name defaults to one derived from `name`, which is what a new deployment
+# wants. They are overridable because a bucket name and a repository name are
+# both force-new and a bucket holding objects cannot be renamed, so a deployment
+# adopting resources that already exist has to be able to state their names
+# rather than move their contents.
+
+variable "uploads_bucket_name" {
+  description = "Uploads bucket. Empty means `<name>-uploads`."
+  type        = string
+  default     = ""
+}
+
+variable "checkpoints_bucket_name" {
+  description = "Agent checkpoints bucket. Empty means `<name>-agent-checkpoints`."
+  type        = string
+  default     = ""
+}
+
+variable "ecr_repository_names" {
+  description = "ECR repository per image. Each unset key means `<name>-<key>`."
+  type = object({
+    api   = optional(string)
+    web   = optional(string)
+    agent = optional(string)
+  })
+  default = {}
 }
 
 variable "artifact_cors_origins" {

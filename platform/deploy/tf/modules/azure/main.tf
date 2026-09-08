@@ -61,11 +61,13 @@ module "aks" {
 module "storage" {
   source = "./storage"
 
-  account_name        = var.storage_account_name
-  location            = azurerm_resource_group.this.location
-  resource_group_name = azurerm_resource_group.this.name
-  cors_origins        = local.cors_origins
-  tags                = local.tags
+  account_name               = var.storage_account_name
+  location                   = azurerm_resource_group.this.location
+  resource_group_name        = azurerm_resource_group.this.name
+  container_name             = var.uploads_container_name
+  checkpoints_container_name = var.checkpoints_container_name
+  cors_origins               = local.cors_origins
+  tags                       = local.tags
 }
 
 module "acr" {
