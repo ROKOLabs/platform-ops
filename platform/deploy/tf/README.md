@@ -146,13 +146,3 @@ Cloudflare or registrar credential.
 3. **Ops points the record at the output.** Create a proxied `CNAME` in Cloudflare
    from `hostname` to `ingress_hostname` (an `A` on Azure, where the address is an
    IP). One zone-wide setting is done once for `rokolabs.ai`: SSL/TLS mode `Full`.
-
-Three consequences worth stating.
-
-- The allowlist is only as fresh as the last apply. Compare the
-  `origin_allowed_cidrs` output against what Cloudflare publishes now; a scheduled
-  plan is the cheap way to notice drift.
-- A locked-down origin cannot be reached directly for debugging. Add your own
-  address to `extra_origin_cidrs` and apply.
-- A deployment that will not sit behind Roko's Cloudflare sets `tls_mode` to
-  `provided` and supplies its own certificate.
