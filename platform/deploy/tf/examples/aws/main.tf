@@ -65,6 +65,11 @@ module "roko" {
   azs          = ["us-east-1a", "us-east-1b"]
   ingress_host = "acme.rokolabs.ai" # CHANGE ME
 
+  # A /24 per zone for pods and a /26 per zone for load balancers. Widen it only
+  # if this cluster will run much more than the platform. It cannot be changed
+  # after the VPC is created.
+  vpc_cidr = "10.0.0.0/22"
+
   # The FULL pathful ARN. EKS rejects a path-stripped SSO role ARN.
   admin_role_arns = [
     "arn:aws:iam::111122223333:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_abc123", # CHANGE ME

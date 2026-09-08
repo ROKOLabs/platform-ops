@@ -34,11 +34,13 @@ resource "azurerm_resource_group" "this" {
 module "vnet" {
   source = "./vnet"
 
-  name                = var.name
-  location            = azurerm_resource_group.this.location
-  resource_group_name = azurerm_resource_group.this.name
-  address_space       = var.vnet_cidr
-  tags                = local.tags
+  name                   = var.name
+  location               = azurerm_resource_group.this.location
+  resource_group_name    = azurerm_resource_group.this.name
+  address_space          = var.vnet_cidr
+  aks_subnet_prefix      = var.aks_subnet_cidr
+  postgres_subnet_prefix = var.postgres_subnet_cidr
+  tags                   = local.tags
 }
 
 module "aks" {

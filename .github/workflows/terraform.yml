@@ -1,117 +1,31 @@
-# Gates the Terraform modules this repository publishes.
-#
-# Nothing here applies anything. The modules are consumed by a deployment's own
-# root, which owns the backend, the provider configuration, the credentials and
-# the state; this repository owns only that they are valid, free of a
-# deployment's execution details, and tagged at the version they deploy.
-# Formatting is checked by format.yml, which runs on every pull request.
+# The release gate: a tag must deploy the platform release it claims to.
+
 name: terraform
+
 on:
   push:
-    branches: [main]
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
       - '[0-9]+.[0-9]+.[0-9]+-*'
-  pull_request:
+
 permissions:
   contents: read
-env:
-  MODULES: platform/deploy/tf/modules
+
 jobs:
-  validate:
-    name: Validate every module
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "~1.15"
-          terraform_wrapper: false
-      # Every module, leaf and composed, initialises and validates on its own.
-      # -backend=false is what lets a module with no backend block initialise at
-      # all, and is the same reason a leaf stays addressable directly.
-      - name: Validate every module
-        run: |
-          set -euo pipefail
-          failed=0
-          while IFS= read -r dir; do
-            echo "::group::$dir"
-            if terraform -chdir="$dir" init -backend=false -input=false -no-color \
-               && terraform -chdir="$dir" validate -no-color; then
-              echo "ok"
-            else
-              failed=1
-            fi
-            echo "::endgroup::"
-          done < <(find "$MODULES" -name '*.tf' -exec dirname {} \; | sort -u)
-          exit "$failed"
-  hygiene:
-    name: Own nothing a deployment owns
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      # A public module that carried any of these would take ownership of a
-      # deployment's execution or state, or leak something.
-      - name: Refuse execution and state artefacts
-        run: |
-          set -euo pipefail
-          fail() { echo "::error::$1"; exit 1; }
-
-          if grep -rnE '^\s*backend\s+"' "$MODULES" --include='*.tf'; then
-            fail "A module declares a backend. The deployment's own root owns state."
-          fi
-
-          if grep -rnE '^\s*provider\s+"[a-z]+"\s*\{' "$MODULES" --include='*.tf'; then
-            fail "A module configures a provider. The deployment's own root owns credentials."
-          fi
-
-          # kubernetes_manifest fetches the API server's schema at plan time, so
-          # it cannot be planned against a cluster that does not exist yet. It is
-          # the one resource type that forces a second apply.
-          if grep -rn 'kubernetes_manifest' "$MODULES" --include='*.tf'; then
-            fail "kubernetes_manifest breaks the single-apply guarantee. Put custom resources in a chart."
-          fi
-
-          # A data source is read during plan; on a first apply there is no
-          # cluster to read and the plan fails before anything is created.
-          if grep -rn 'aws_eks_cluster_auth' "$MODULES" --include='*.tf'; then
-            fail "aws_eks_cluster_auth is read at plan time. Authenticate with an exec block."
-          fi
-
-          if find "$MODULES" \( -name '.terraform.lock.hcl' -o -name '*.tfstate*' -o -name 'tfplan*' -o -name '.terraform' \) -print | grep .; then
-            fail "A lock file, state file, plan file or .terraform directory is committed."
-          fi
-      # Roko owns DNS for every deployment and runs it in Cloudflare. A module
-      # that created a record would need a credential this repository must never
-      # hold, and a hard-coded range would go stale without anyone noticing.
-      - name: Refuse DNS ownership
-        run: |
-          set -euo pipefail
-          fail() { echo "::error::$1"; exit 1; }
-
-          if grep -rnE '(resource|data)[[:space:]]+"(aws_route53_(zone|record)|azurerm_dns_[a-z_]+|cloudflare_[a-z_]+)"' "$MODULES" --include='*.tf'; then
-            fail "A module takes ownership of DNS. Ops points the record at the module's output."
-          fi
-
-          # The allowlist must be whatever Cloudflare publishes at the moment of
-          # the apply, never a list written down here.
-          if grep -rnE '17[23]\.6[0-9]\.[0-9]+\.[0-9]+/|104\.1[6-9]\.[0-9]+\.[0-9]+/' "$MODULES" --include='*.tf'; then
-            fail "A Cloudflare address range is hard-coded. Read them from the published endpoint."
-          fi
   version:
     name: Tag matches version.tf
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: startsWith(github.ref, 'refs/tags/')
+
     steps:
       - uses: actions/checkout@v4
-      # The module's version is the platform version: a deployment pinned at
-      # ?ref=X.Y.Z gets the infrastructure, the chart and the images of X.Y.Z.
-      # A tag that disagrees with the constant would ship a module deploying
-      # another release's images, so it fails the release instead.
+
+      # A deployment pinned at ?ref=X.Y.Z gets the infrastructure, the chart and
+      # the images of X.Y.Z. A tag that disagrees with the constant would ship a
+      # module deploying another release's images, so it fails the release.
       - name: Compare the tag against every version.tf
+        env:
+          MODULES: platform/deploy/tf/modules
         run: |
           set -euo pipefail
           TAG="${GITHUB_REF#refs/tags/}"

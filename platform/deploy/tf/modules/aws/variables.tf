@@ -16,9 +16,21 @@ variable "ingress_host" {
 # ── Network ──────────────────────────────────────────────────────────────────
 
 variable "vpc_cidr" {
-  description = "VPC CIDR. CANNOT be changed after creation."
+  description = "VPC CIDR. Cannot be changed after creation. A /22 gives each zone a /24 for pods and a /26 for load balancers, which is ample for this platform; widen it only for a deployment that will run much more in the cluster."
   type        = string
-  default     = "10.0.0.0/16"
+  default     = "10.0.0.0/22"
+}
+
+variable "private_subnet_cidrs" {
+  description = "Private subnet CIDRs, one per zone, in the same order as `azs`. Empty derives them from `vpc_cidr`. Set them only to match subnets that already exist."
+  type        = list(string)
+  default     = []
+}
+
+variable "public_subnet_cidrs" {
+  description = "Public subnet CIDRs, one per zone, in the same order as `azs`. Empty derives them from `vpc_cidr`."
+  type        = list(string)
+  default     = []
 }
 
 variable "azs" {

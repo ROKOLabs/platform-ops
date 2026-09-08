@@ -63,9 +63,10 @@ once is the cheaper trade.
 Two details in the AWS file matter and should not be edited. The Kubernetes and
 Helm providers authenticate with an `exec` block rather than
 `data "aws_eks_cluster_auth"`, because a data source is read during plan and on
-the first apply there is no cluster to read. And no configuration anywhere uses
+the first apply there is no cluster to read. And nothing anywhere uses
 `kubernetes_manifest`, which fetches the API server's schema at plan time.
-Together those are what make a single apply possible.
+Together those are what make a single apply possible, so keep them if you edit
+the file.
 
 ## 3. Fill in the values
 
@@ -243,8 +244,14 @@ module "roko" {
   name         = "rokolabs-dev"
   region       = "us-east-1"
   azs          = ["us-east-1a", "us-east-1b"]
-  vpc_cidr     = "10.180.0.0/16"
   ingress_host = "platform.dev.rokolabs.ai"
+
+  # Pin the network exactly. Changing a subnet's range replaces it and
+  # everything attached to it, so an adopting deployment states what it has
+  # rather than letting the module derive a layout.
+  vpc_cidr             = "10.180.0.0/16"
+  private_subnet_cidrs = ["10.180.0.0/20", "10.180.16.0/20"]
+  public_subnet_cidrs  = ["10.180.200.0/24", "10.180.201.0/24"]
 
   uploads_bucket_name     = "roko-platform-uploads-dev"
   checkpoints_bucket_name = "roko-platform-agent-checkpoints-dev"
@@ -362,7 +369,9 @@ module "roko" {
 
 | Input | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `vpc_cidr` | string | `10.0.0.0/16` | VPC range. Cannot be changed after creation. |
+| `vpc_cidr` | string | `10.0.0.0/22` | VPC range. Cannot be changed after creation. A /22 gives each zone a /24 for pods and a /26 for load balancers. |
+| `private_subnet_cidrs` | list(string) | `[]` | Private subnet CIDRs, one per zone, in the order of `azs`. Empty derives them from `vpc_cidr`. Set them only to match subnets that already exist. |
+| `public_subnet_cidrs` | list(string) | `[]` | Public subnet CIDRs, same rule. |
 | `single_nat_gateway` | bool | `true` | `true` shares one NAT gateway across every zone. `false` creates one per zone. |
 | `kubernetes_version` | string | `1.34` | EKS version. |
 | `api_allowed_cidrs` | list(string) | `["0.0.0.0/0"]` | Who may reach the EKS public API endpoint. |
@@ -461,7 +470,9 @@ The same shape with Azure's own names. Four names are required rather than deriv
 
 | Input | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `vnet_cidr` | string | `10.0.0.0/16` | VNet address space. Cannot be changed after creation. |
+| `vnet_cidr` | string | `10.0.0.0/22` | VNet address space. Cannot be changed after creation. A /22 gives AKS a /23 and Postgres a /26. |
+| `aks_subnet_cidr` | string | `""` | Subnet for AKS nodes and pods. Empty derives it from `vnet_cidr`. Set it only to match a subnet that already exists. |
+| `postgres_subnet_cidr` | string | `""` | Delegated subnet for the Flexible Server, same rule. |
 | `kubernetes_version` | string | `1.36` | AKS version. |
 | `api_allowed_cidrs` | list(string) | `[]` | Who may reach the AKS public API server. Empty means open. |
 | `agent_node_vm_size` | string | `Standard_D4s_v5` | VM size for the autoscaling agent pool. A D4s_v5 has room for one three-CPU agent Job plus the AKS DaemonSets. |

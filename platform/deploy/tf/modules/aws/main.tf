@@ -35,11 +35,13 @@ data "aws_caller_identity" "current" {}
 module "network" {
   source = "./network"
 
-  name               = var.name
-  cidr               = var.vpc_cidr
-  azs                = var.azs
-  single_nat_gateway = var.single_nat_gateway
-  tags               = local.tags
+  name                 = var.name
+  cidr                 = var.vpc_cidr
+  azs                  = var.azs
+  private_subnet_cidrs = var.private_subnet_cidrs
+  public_subnet_cidrs  = var.public_subnet_cidrs
+  single_nat_gateway   = var.single_nat_gateway
+  tags                 = local.tags
 }
 
 module "cluster" {

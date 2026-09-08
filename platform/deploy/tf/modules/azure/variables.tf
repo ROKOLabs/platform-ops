@@ -16,9 +16,21 @@ variable "ingress_host" {
 # ── Network and cluster ──────────────────────────────────────────────────────
 
 variable "vnet_cidr" {
-  description = "VNet address space. CANNOT be changed after creation."
+  description = "VNet address space. CANNOT be changed after creation. A /22 gives AKS a /23 for nodes and pods and Postgres a /26; widen it only for a deployment that will run much more in the cluster."
   type        = string
-  default     = "10.0.0.0/16"
+  default     = "10.0.0.0/22"
+}
+
+variable "aks_subnet_cidr" {
+  description = "Subnet for AKS nodes and pods. Empty derives it from `vnet_cidr`. Set it only to match a subnet that already exists."
+  type        = string
+  default     = ""
+}
+
+variable "postgres_subnet_cidr" {
+  description = "Delegated subnet for the PostgreSQL Flexible Server. Empty derives it from `vnet_cidr`."
+  type        = string
+  default     = ""
 }
 
 variable "kubernetes_version" {
