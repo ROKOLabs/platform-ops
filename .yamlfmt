@@ -1,0 +1,5 @@
+# yamlfmt strips every blank line by default, which would collapse the spacing
+# that separates steps and jobs in a workflow. Keep the breaks the author wrote.
+formatter:
+  type: basic
+  retain_line_breaks_single: true
