@@ -23,6 +23,9 @@ plan.txt
 .terraformrc
 terraform.rc
 
+# Local change request drafts
+/cr-drafts/
+
 # Emacs
 *~
 \#*\#
