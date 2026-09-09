@@ -57,6 +57,24 @@ variable "database_url_secret_name" {
   default     = "database-url"
 }
 
+variable "zone" {
+  description = "Availability zone the server runs in."
+  type        = string
+  default     = "1"
+}
+
+variable "high_availability" {
+  description = "Run a standby in `standby_zone`. Needs a General Purpose or Memory Optimized SKU; Burstable cannot."
+  type        = bool
+  default     = false
+}
+
+variable "standby_zone" {
+  description = "Zone the standby runs in. Must differ from `zone`."
+  type        = string
+  default     = "2"
+}
+
 variable "tags" {
   type    = map(string)
   default = {}

@@ -18,6 +18,10 @@ resource "azurerm_kubernetes_cluster" "this" {
     node_count     = var.node_count
     vm_size        = var.node_vm_size
     vnet_subnet_id = var.aks_subnet_id
+    # A zone is where compute comes from as well as where redundancy lives. In a
+    # region whose capacity is tight, asking across three zones is often the
+    # difference between a node being created and a pod staying Pending.
+    zones = var.zones
   }
 
   # System-assigned identity for the control plane; workloads use their own
@@ -60,6 +64,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "agents" {
   node_count           = var.agent_node_min_count
   min_count            = var.agent_node_min_count
   max_count            = var.agent_node_max_count
+  zones                = var.zones
 
   node_labels = {
     "roko.dev/agent-pool" = "agents"

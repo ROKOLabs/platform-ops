@@ -15,17 +15,35 @@ resource "azurerm_key_vault" "this" {
 
   rbac_authorization_enabled = true
   purge_protection_enabled   = false
+
+  # A deleted vault keeps its name reserved for the whole retention window, so a
+  # destroy-and-recreate of the same deployment fails until somebody purges it by
+  # hand. Seven days is the minimum Azure allows and the shortest that trap runs.
+  soft_delete_retention_days = var.soft_delete_retention_days
 }
 
-# Lets a human (or the CI principal) seed the out-of-band secrets with
-# `az keyvault secret set`.
+# The vault authorizes by RBAC, so creating it grants nobody anything, not even
+# its creator. Terraform writes the database URL and the encryption key into it
+# during the same apply, so without this it creates a vault it is then forbidden
+# to use and the apply fails 403. This used to be granted out of band with
+# `az role assignment create`, which is what made the first apply a two-step.
 #
-# Commented out: the Terraform principal lacks Microsoft.Authorization/roleAssignments/write
-# (needs Owner or Contributor + User Access Administrator). Granted manually via
-# `az role assignment create` instead — see deploy/plcp/tf/README.md.
-# resource "azurerm_role_assignment" "secrets_officer" {
-#   for_each             = toset(var.admin_object_ids)
-#   scope                = azurerm_key_vault.this.id
-#   role_definition_name = "Key Vault Secrets Officer"
-#   principal_id         = each.value
-# }
+# It needs Microsoft.Authorization/roleAssignments/write, so the principal
+# applying this module has to be Owner, or Contributor plus User Access
+# Administrator. The setup guide says so.
+resource "azurerm_role_assignment" "secrets_officer" {
+  for_each = toset(var.admin_object_ids)
+
+  scope                = azurerm_key_vault.this.id
+  role_definition_name = "Key Vault Secrets Officer"
+  principal_id         = each.value
+}
+
+# Azure RBAC is eventually consistent: a data-plane call made immediately after
+# the assignment is created is still refused. Without this the first apply fails
+# 403 on the first secret and succeeds on a retry, which is the least debuggable
+# kind of failure.
+resource "time_sleep" "rbac_propagation" {
+  depends_on      = [azurerm_role_assignment.secrets_officer]
+  create_duration = "60s"
+}

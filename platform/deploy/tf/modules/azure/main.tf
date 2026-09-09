@@ -55,6 +55,7 @@ module "aks" {
   agent_node_vm_size   = var.agent_node_vm_size
   agent_node_min_count = var.agent_node_min_count
   agent_node_max_count = var.agent_node_max_count
+  zones                = var.zones
   tags                 = local.tags
 }
 
@@ -108,10 +109,17 @@ module "postgres" {
   vnet_id             = module.vnet.vnet_id
   delegated_subnet_id = module.vnet.postgres_subnet_id
   key_vault_id        = module.keyvault.vault_id
-  tags                = local.tags
+  sku_name            = var.postgres_sku_name
 
-  # The Secrets Officer grant must exist before Terraform writes the DATABASE_URL
-  # secret into the vault.
+  zone              = try(var.zones[0], "1")
+  standby_zone      = try(var.zones[1], "2")
+  high_availability = var.high_availability
+
+  tags = local.tags
+
+  # Waits for every resource in the vault module, which includes the Secrets
+  # Officer grant and the pause that lets it propagate. Writing the DATABASE_URL
+  # secret before either is a 403.
   depends_on = [module.keyvault]
 }
 
@@ -176,6 +184,7 @@ resource "azurerm_key_vault_secret" "secret_encryption" {
   key_vault_id = module.keyvault.vault_id
   value        = jsonencode({ SECRET_ENCRYPTION_KEY = random_bytes.secret_encryption_key.base64 })
 
+  # Same reason as the database URL: the grant must exist and have propagated.
   depends_on = [module.keyvault]
 }
 

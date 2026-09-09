@@ -30,18 +30,30 @@ provider "azurerm" {
   subscription_id = "00000000-0000-0000-0000-000000000000" # CHANGE ME
 }
 
+# The Foundry account and its model deployments are created through azapi, which
+# reads its own subscription rather than azurerm's. Set the same one.
+provider "azapi" {
+  subscription_id = "00000000-0000-0000-0000-000000000000" # CHANGE ME
+}
+
 # AKS hands out an admin kubeconfig, so these read the cluster's own credentials
-# rather than shelling out. Both providers depend on the module's outputs, so
-# every resource they own is applied after the cluster exists.
+# rather than shelling out. All four fields are needed: the kubeconfig
+# authenticates with a client certificate, so host and CA alone is not a
+# credential and every resource fails unauthorized. Both providers depend on the
+# module's outputs, so everything they own is applied after the cluster exists.
 provider "kubernetes" {
   host                   = module.roko.cluster_endpoint
   cluster_ca_certificate = base64decode(module.roko.cluster_ca_certificate)
+  client_certificate     = base64decode(module.roko.cluster_client_certificate)
+  client_key             = base64decode(module.roko.cluster_client_key)
 }
 
 provider "helm" {
   kubernetes = {
     host                   = module.roko.cluster_endpoint
     cluster_ca_certificate = base64decode(module.roko.cluster_ca_certificate)
+    client_certificate     = base64decode(module.roko.cluster_client_certificate)
+    client_key             = base64decode(module.roko.cluster_client_key)
   }
 }
 
@@ -59,6 +71,14 @@ module "roko" {
   # Who may reach the Kubernetes API server. Terraform reaches it too, so the
   # address running this has to be in the list.
   api_allowed_cidrs = ["203.0.113.0/24"] # CHANGE ME
+
+  # Node pools and the database are spread across these. Empty for a region with
+  # no availability zones.
+  zones = ["1", "2", "3"]
+
+  # A standby database in a second zone. It needs a General Purpose SKU, so
+  # turning it on means changing postgres_sku_name too.
+  high_availability = false
 
   # Azure makes these four globally unique, so the module cannot derive them.
   storage_account_name = "acmeproduploads" # CHANGE ME

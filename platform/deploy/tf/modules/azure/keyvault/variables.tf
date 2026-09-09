@@ -21,6 +21,12 @@ variable "admin_object_ids" {
   default     = []
 }
 
+variable "soft_delete_retention_days" {
+  description = "How long a deleted vault keeps its name reserved. Seven is Azure's minimum."
+  type        = number
+  default     = 7
+}
+
 variable "tags" {
   type    = map(string)
   default = {}

@@ -55,7 +55,7 @@ piece Terraform does not create: you add one record to it at the end.
 | --- | --- |
 | Terraform | 1.11 or newer. |
 | AWS | An account, and the `aws` CLI signed in with permission to create VPCs, EKS clusters, RDS instances, S3 buckets, IAM roles and Secrets Manager secrets. |
-| Azure | A subscription, and the `az` CLI signed in with Owner, or Contributor plus User Access Administrator. The module assigns a role, which Contributor alone cannot do. |
+| Azure | A subscription, and the `az` CLI signed in with Owner, or Contributor plus User Access Administrator. The module assigns two roles — Key Vault Secrets Officer for itself, so it can write the secrets it generates, and AcrPull for the kubelet — and Contributor alone cannot assign a role. |
 | DNS | A hostname for the deployment. Roko owns DNS and runs it in Cloudflare; you will create one record at the end. |
 
 You do not need a certificate, and you do not need to create any secret by hand.
@@ -521,6 +521,9 @@ The same shape with Azure's own names. Four names are required rather than deriv
 | Input | Type | Default | Purpose |
 | --- | --- | --- | --- |
 | `vnet_cidr` | string | `10.0.0.0/20` | VNet address space. Cannot be changed after creation. A /20 gives AKS a /21 and Postgres a /24. |
+| `zones` | list(string) | `["1","2","3"]` | Zones the node pools are spread across, and the zones the database runs in. Three rather than one: a zone is where compute comes from as well as where redundancy lives. Empty for a region with no zones. |
+| `high_availability` | bool | `false` | Runs a standby database in a second zone. Needs a General Purpose or Memory Optimized `postgres_sku_name`; a Burstable server cannot run a standby, and the plan refuses rather than letting Azure refuse the create. |
+| `postgres_sku_name` | string | `B_Standard_B1ms` | Flexible Server SKU. Burstable is the cheap default. |
 | `aks_subnet_cidr` | string | `""` | Subnet for AKS nodes and pods. Empty derives it from `vnet_cidr`. Set it only to match a subnet that already exists. |
 | `postgres_subnet_cidr` | string | `""` | Delegated subnet for the Flexible Server, same rule. |
 | `kubernetes_version` | string | `1.36` | AKS version. |
@@ -582,7 +585,7 @@ The names match `modules/aws` wherever the thing behind them matches, so a calle
 | Output | Purpose |
 | --- | --- |
 | `cluster_name` | For `az aks get-credentials` and for CI. |
-| `cluster_endpoint`, `cluster_ca_certificate` | Configure the deployment's own Kubernetes and Helm providers. |
+| `cluster_endpoint`, `cluster_ca_certificate`, `cluster_client_certificate`, `cluster_client_key` | Configure the deployment's own Kubernetes and Helm providers. All four: the AKS kubeconfig authenticates with a client certificate, so the host and the CA alone are not a credential. |
 | `resource_group_name` | Resource group holding the deployment. |
 | `db_host` | Postgres FQDN. The pod reads the whole URL from Key Vault; this is for a person connecting by hand. |
 | `uploads_bucket`, `checkpoints_bucket` | The two Blob containers. |

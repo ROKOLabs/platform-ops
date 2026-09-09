@@ -44,6 +44,24 @@ variable "api_allowed_cidrs" {
   type        = list(string)
 }
 
+variable "zones" {
+  description = "Availability zones the node pools are spread across, and the zones the database runs in. Three rather than one: a zone is where compute comes from as well as where redundancy lives, and in a constrained region the third is often what gets a node created instead of a pod staying Pending. Empty for a region with no zones."
+  type        = list(string)
+  default     = ["1", "2", "3"]
+}
+
+variable "high_availability" {
+  description = "Run a standby database in a second zone. Off by default; it needs a General Purpose or Memory Optimized `postgres_sku_name`, because a Burstable server cannot run a standby at all."
+  type        = bool
+  default     = false
+}
+
+variable "postgres_sku_name" {
+  description = "Flexible Server SKU. Burstable (B_*) is the cheap default and cannot run a standby."
+  type        = string
+  default     = "B_Standard_B1ms"
+}
+
 variable "agent_node_vm_size" {
   description = "VM size for the autoscaling agent user pool. A D4s_v5 has room for one three-CPU agent Job plus the AKS DaemonSets."
   type        = string

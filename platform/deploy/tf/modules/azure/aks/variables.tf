@@ -65,6 +65,12 @@ variable "api_allowed_cidrs" {
   default     = []
 }
 
+variable "zones" {
+  description = "Availability zones both node pools are spread across. Empty for a region that has none."
+  type        = list(string)
+  default     = ["1", "2", "3"]
+}
+
 variable "tags" {
   type    = map(string)
   default = {}

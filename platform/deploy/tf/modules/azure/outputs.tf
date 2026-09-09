@@ -15,6 +15,21 @@ output "cluster_ca_certificate" {
   sensitive   = true
 }
 
+# AKS hands out an admin kubeconfig that authenticates with a client
+# certificate. A provider given only the host and the CA has no credential at
+# all and every Kubernetes and Helm resource fails unauthorized.
+output "cluster_client_certificate" {
+  description = "Base64 client certificate for the Kubernetes and Helm providers."
+  value       = module.aks.kube_client_certificate
+  sensitive   = true
+}
+
+output "cluster_client_key" {
+  description = "Base64 client key for the Kubernetes and Helm providers."
+  value       = module.aks.kube_client_key
+  sensitive   = true
+}
+
 output "resource_group_name" {
   description = "Resource group holding the deployment."
   value       = azurerm_resource_group.this.name

@@ -48,10 +48,28 @@ resource "azurerm_postgresql_flexible_server" "this" {
   public_network_access_enabled = false
 
   backup_retention_days = 7
-  zone                  = "1"
+  zone                  = var.zone
+
+  # A standby in a second zone, which is what makes losing a zone survivable.
+  # Burstable SKUs cannot do it at all, which is why the precondition below
+  # refuses the plan rather than letting Azure refuse the create.
+  dynamic "high_availability" {
+    for_each = var.high_availability ? [1] : []
+    content {
+      mode                      = "ZoneRedundant"
+      standby_availability_zone = var.standby_zone
+    }
+  }
 
   # The DNS link must exist before the server so name resolution works.
   depends_on = [azurerm_private_dns_zone_virtual_network_link.this]
+
+  lifecycle {
+    precondition {
+      condition     = !var.high_availability || !startswith(var.sku_name, "B_")
+      error_message = "high_availability needs a General Purpose or Memory Optimized SKU. Burstable (B_*) servers cannot run a standby, so set sku_name to a GP_* or MO_* size, or turn high_availability off."
+    }
+  }
 }
 
 # Flexible Server blocks CREATE EXTENSION unless the extension is on this
