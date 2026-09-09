@@ -1,0 +1,53 @@
+# Formatting, on every pull request.
+#
+# There is deliberately no `paths:` filter here. A path filter would stop the
+# workflow from triggering at all, so a pull request touching only files it does
+# not list would report no formatting check rather than a passing one, and a
+# required check that never runs blocks nothing.
+#
+# Each tool below is the one the repository already declares:
+# .pre-commit-config.yaml for YAML, shell and PowerShell, and `terraform fmt`
+# for the modules.
+
+name: format
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    name: terraform fmt
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.15"
+          terraform_wrapper: false
+
+      # The whole tree, not just the module directory, so a .tf file added
+      # anywhere else is still formatted.
+      - name: Check formatting
+        run: terraform fmt -check -recursive -diff .
+
+  pre-commit:
+    name: yamlfmt, shfmt, dprint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: pre-commit/action@v3.0.1

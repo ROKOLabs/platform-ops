@@ -1,0 +1,40 @@
+# The release gate: a tag must deploy the platform release it claims to.
+
+name: terraform
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+-*'
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Tag matches version.tf
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # A deployment pinned at ?ref=X.Y.Z gets the infrastructure, the chart and
+      # the images of X.Y.Z. A tag that disagrees with the constant would ship a
+      # module deploying another release's images, so it fails the release.
+      - name: Compare the tag against every version.tf
+        env:
+          MODULES: platform/deploy/tf/modules
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF#refs/tags/}"
+          status=0
+          for f in "$MODULES"/*/version.tf; do
+            declared=$(sed -nE 's/^[[:space:]]*platform_version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' "$f")
+            if [ "$declared" != "$TAG" ]; then
+              echo "::error file=$f::platform_version is \"$declared\", tag is \"$TAG\"."
+              status=1
+            fi
+          done
+          exit "$status"
