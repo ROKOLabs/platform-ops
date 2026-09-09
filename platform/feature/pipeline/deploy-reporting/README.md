@@ -17,14 +17,14 @@ Add this step after the deployment step:
 
 ```yaml
 - name: Report the deployment to Roko
-  uses: ROKOLabs/platform-ops/platform/feature/pipeline/deploy-reporting/wrappers/github@v1
+  uses: ROKOLabs/platform-ops/platform/feature/pipeline/deploy-reporting/wrappers/github@0.0.1
   with:
     url: https://platform.example.com/api/deploys
     token: ${{ secrets.ROKO_DEPLOY_TOKEN }}
     environment: prod
 ```
 
-The `@v1` suffix selects the `v1` Git tag in the `platform-ops` repository.
+The `@0.0.1` suffix selects the `0.0.1` Git tag in the `platform-ops` repository.
 
 The action uses `github.sha` as the commit. Set `strict: true` only when a failed
 report should fail the workflow step.
