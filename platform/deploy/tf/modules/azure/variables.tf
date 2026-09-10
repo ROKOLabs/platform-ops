@@ -1,6 +1,12 @@
 variable "name" {
-  description = "Name prefix for every resource this module creates, and the resource group's name."
+  description = "The resource group's name, and the default prefix for the resources inside it."
   type        = string
+}
+
+variable "resource_prefix" {
+  description = "Name prefix for the resources inside the group, when they should not be named after it. Empty uses `name`. Every name it feeds is force-new, so setting it on a deployment that already exists rebuilds the VNet, the cluster and the database with it."
+  type        = string
+  default     = ""
 }
 
 variable "location" {

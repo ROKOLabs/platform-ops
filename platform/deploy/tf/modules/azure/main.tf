@@ -7,6 +7,11 @@
 # its storage backend, its secret backend and its workload identity from them.
 
 locals {
+  # The group is named by `name`; what sits inside it is named by
+  # `resource_prefix` when a deployment wants the two to differ, and by `name`
+  # otherwise. Not `coalesce`, which takes "" for an answer.
+  resource_prefix = var.resource_prefix != "" ? var.resource_prefix : var.name
+
   tags = merge(
     {
       Project   = var.name
@@ -34,7 +39,7 @@ resource "azurerm_resource_group" "this" {
 module "vnet" {
   source = "./vnet"
 
-  name                   = var.name
+  name                   = local.resource_prefix
   location               = azurerm_resource_group.this.location
   resource_group_name    = azurerm_resource_group.this.name
   address_space          = var.vnet_cidr
@@ -46,7 +51,7 @@ module "vnet" {
 module "aks" {
   source = "./aks"
 
-  name                 = var.name
+  name                 = local.resource_prefix
   location             = azurerm_resource_group.this.location
   resource_group_name  = azurerm_resource_group.this.name
   kubernetes_version   = var.kubernetes_version
@@ -126,7 +131,7 @@ module "postgres" {
 module "workload_identity" {
   source = "./workload-identity"
 
-  name                = var.name
+  name                = local.resource_prefix
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
   oidc_issuer_url     = module.aks.oidc_issuer_url
