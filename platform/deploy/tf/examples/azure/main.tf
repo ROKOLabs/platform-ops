@@ -64,6 +64,11 @@ module "roko" {
   location     = "southcentralus"
   ingress_host = "acme.rokolabs.ai" # CHANGE ME
 
+  # `name` names the resource group and, by default, everything inside it. Set
+  # this to name the contents differently. Every name it feeds is force-new, so
+  # it belongs in the first apply, not a later one.
+  # resource_prefix = "acme-prod"
+
   # A /21 for AKS nodes and pods and a /24 for Postgres. Cannot be changed after
   # the VNet is created.
   vnet_cidr = "10.0.0.0/20"

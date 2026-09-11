@@ -506,7 +506,7 @@ The same shape with Azure's own names. Four names are required rather than deriv
 
 | Input | Type | Purpose |
 | --- | --- | --- |
-| `name` | string | Name prefix for every resource, and the resource group's name. |
+| `name` | string | The resource group's name, and the default prefix for the resources inside it. |
 | `location` | string | Azure region. |
 | `ingress_host` | string | Public hostname the platform serves. |
 | `api_allowed_cidrs` | list(string) | Who may reach the AKS public API server. No default, for the same reason as AWS. |
@@ -515,6 +515,12 @@ The same shape with Azure's own names. Four names are required rather than deriv
 | `key_vault_name` | string | Key Vault. Globally unique, 3-24 alphanumerics and hyphens. |
 | `postgres_server_name` | string | PostgreSQL Flexible Server. Globally unique, lowercase. |
 | `foundry` | object | Foundry account, project and model deployments. See the table below. |
+
+### Names
+
+| Input | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `resource_prefix` | string | `""` | Name prefix for the resources inside the group, when they should not be named after it. Empty uses `name`. It feeds the VNet and its subnets, the AKS cluster and its DNS prefix, and the three managed identities; the group itself, the `Project` tag and the origin certificate's subject stay on `name`. Every name it feeds is force-new, and the Flexible Server's delegated subnet is force-new too, so setting it on a deployment that already exists rebuilds the network, the cluster and the database. It is for a deployment that has not been applied yet, or one accepting that rebuild. |
 
 ### Network and cluster
 
