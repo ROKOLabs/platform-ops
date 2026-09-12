@@ -296,6 +296,19 @@ resource "helm_release" "ingress_nginx" {
     controller = {
       service = {
         loadBalancerSourceRanges = concat(local.origin_ipv4_cidrs, local.origin_ipv6_cidrs)
+
+        # The chart sets appProtocol http/https on the two service ports, which
+        # makes the Azure cloud provider build HTTP(S) probes rather than TCP
+        # ones and default their request path to "/". The only Ingress rule is
+        # host-based, so "/" answers 404, Azure treats anything but a 2xx as
+        # unhealthy, and every node drops out of the backend pool: the load
+        # balancer then blackholes inbound traffic and Cloudflare reports 522.
+        # /healthz is the controller's own endpoint and answers 200 on both
+        # ports -- including 443, whose probe is HTTPS and which Azure does not
+        # certificate-check, so the self-signed origin cert is not a problem.
+        annotations = {
+          "service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path" = "/healthz"
+        }
       }
     }
   })]
