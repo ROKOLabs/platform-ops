@@ -50,6 +50,16 @@ output "checkpoints_bucket" {
   value       = module.storage.checkpoints_container_name
 }
 
+output "tickets_identity_client_id" {
+  description = "Client ID passed to roko-api so it can request Azure DevOps tokens."
+  value       = module.workload_identity.tickets_client_id
+}
+
+output "tickets_identity_principal_id" {
+  description = "Object ID an Azure DevOps administrator uses to find the tickets identity."
+  value       = module.workload_identity.tickets_principal_id
+}
+
 output "hostname" {
   description = "The name this deployment serves, echoed back, so Ops knows the record to create."
   value       = var.ingress_host

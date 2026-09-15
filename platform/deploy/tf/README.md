@@ -198,6 +198,19 @@ On Azure, finish by pasting `foundry_openai_endpoint` and
 Bedrock is unreachable from AKS, so `azure-openai` is the provider kind that
 deployment serves.
 
+The Azure module also creates a dedicated `${name}-tickets` managed identity
+and passes its client ID to the API through Helm. Give an Azure DevOps
+organization administrator these outputs:
+
+```bash
+terraform output tickets_identity_client_id
+terraform output tickets_identity_principal_id
+```
+
+The administrator adds that identity to the Azure DevOps organization and
+grants its project and work-item permissions. Azure DevOps returns no secret.
+The API uses the client ID that Terraform already put in its Helm values.
+
 ## Day two
 
 **Upgrade to a new release.** Change the `?ref=` in your `source` and apply. One
