@@ -98,9 +98,12 @@ module "roko" {
   }
 }
 
-# The two values Ops needs to create the DNS record, and the two a person pastes
-# into Settings, Models.
+# The two values Ops needs to create the DNS record, the two a person pastes
+# into Settings, Models, and the two an Azure DevOps administrator needs to
+# identify the managed identity.
 output "hostname" { value = module.roko.hostname }
 output "ingress_hostname" { value = module.roko.ingress_hostname }
 output "foundry_openai_endpoint" { value = module.roko.foundry_openai_endpoint }
 output "foundry_gpt_deployment_name" { value = module.roko.foundry_gpt_deployment_name }
+output "tickets_identity_client_id" { value = module.roko.tickets_identity_client_id }
+output "tickets_identity_principal_id" { value = module.roko.tickets_identity_principal_id }

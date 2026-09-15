@@ -5,9 +5,11 @@
 # scopes what that identity can do. No keys anywhere; DefaultAzureCredential
 # resolves the token in-pod.
 #
-# Two identities serve three ServiceAccounts:
+# Three identities serve three ServiceAccounts:
 #   - api              → Storage Blob Data Contributor on the storage account
 #                        (used by roko-api and the agent Jobs)
+#   - tickets          → Azure DevOps Boards access granted by an organization
+#                        administrator (used only by roko-api)
 #   - external-secrets → Key Vault Secrets User on the vault
 
 # --- roko-api: blob read/write for artifacts + prototypes --------------------
@@ -44,6 +46,28 @@ resource "azurerm_federated_identity_credential" "agent" {
 #   role_definition_name = "Storage Blob Data Contributor"
 #   principal_id         = azurerm_user_assigned_identity.api.principal_id
 # }
+
+# --- tickets: Azure DevOps Boards as the platform identity ------------------
+#
+# Keep this identity separate from the API identity. Agent Jobs can assume the
+# API identity, but only roko-api should be able to request an Azure DevOps
+# token. Azure DevOps permissions are assigned in the organization, not by an
+# Azure role assignment in this module.
+resource "azurerm_user_assigned_identity" "tickets" {
+  name                = "${var.name}-tickets"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  tags                = var.tags
+}
+
+resource "azurerm_federated_identity_credential" "tickets" {
+  name                = "${var.name}-tickets"
+  resource_group_name = var.resource_group_name
+  parent_id           = azurerm_user_assigned_identity.tickets.id
+  audience            = ["api://AzureADTokenExchange"]
+  issuer              = var.oidc_issuer_url
+  subject             = "system:serviceaccount:${var.service_namespace}:${var.api_service_account}"
+}
 
 # --- external-secrets: read secrets from Key Vault ---------------------------
 resource "azurerm_user_assigned_identity" "external_secrets" {

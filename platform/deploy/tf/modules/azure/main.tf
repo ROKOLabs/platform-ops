@@ -343,6 +343,13 @@ locals {
       # rejects the object id with AADSTS700016.
       workloadIdentity = { clientId = module.workload_identity.api_client_id }
 
+      # This dedicated identity lets roko-api authenticate to Azure DevOps
+      # Boards without a stored PAT. An Azure DevOps organization administrator
+      # still grants the identity its project permissions after the apply.
+      ticketing = {
+        azureDevOpsIdentityClientId = module.workload_identity.tickets_client_id
+      }
+
       # Azure PostgreSQL Flexible Server has no managed rotating secret, so
       # Terraform writes the whole postgres:// URL to this Key Vault secret and
       # ESO maps it straight to DATABASE_URL. host, port and secretArn are unused
