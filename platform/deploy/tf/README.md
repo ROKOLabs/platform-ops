@@ -71,7 +71,7 @@ local, which is why it is separate.
 
 ```hcl
 module "tf_backend" {
-  source      = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws/tf-backend?ref=0.0.15"
+  source      = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws/tf-backend?ref=0.0.16"
   bucket_name = "acme-prod-tfstate"
 }
 ```
@@ -252,7 +252,7 @@ such a deployment also sets `restrict_origin_to_cloudflare = false`.
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.15"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.16"
 
   name         = "acme-prod"
   region       = "us-east-1"
@@ -280,7 +280,7 @@ module "roko" {
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.15"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.16"
 
   name         = "acme-prod"
   region       = "us-east-1"
@@ -300,7 +300,7 @@ A deployment migrating off hand-written Terraform states the names it already ha
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.15"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.16"
 
   name         = "rokolabs-dev"
   region       = "us-east-1"
@@ -332,7 +332,7 @@ The only supported override of the version constant. It changes the images, neve
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.15"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.16"
 
   name         = "rokolabs-dev"
   region       = "us-east-1"
@@ -362,7 +362,7 @@ Memory limits each node to one agent, so the node ceiling and the agent concurre
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.15"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.16"
 
   name         = "acme-prod"
   location     = "southcentralus"
@@ -394,7 +394,7 @@ module "roko" {
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.15"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.16"
 
   name         = "acme-prod"
   location     = "southcentralus"
@@ -424,7 +424,7 @@ do not remove the Foundry requirement.
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.15"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.16"
 
   name         = "acme-prod"
   location     = "southcentralus"
