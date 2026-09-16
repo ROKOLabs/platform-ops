@@ -55,7 +55,7 @@ piece Terraform does not create: you add one record to it at the end.
 | --- | --- |
 | Terraform | 1.11 or newer. |
 | AWS | An account, and the `aws` CLI signed in with permission to create VPCs, EKS clusters, RDS instances, S3 buckets, IAM roles and Secrets Manager secrets. |
-| Azure | A subscription, and the `az` CLI signed in with Owner, or Contributor plus User Access Administrator. The module assigns two roles — Key Vault Secrets Officer for itself, so it can write the secrets it generates, and AcrPull for the kubelet — and Contributor alone cannot assign a role. |
+| Azure | A subscription, and the `az` CLI signed in with Owner, or Contributor plus User Access Administrator. The module assigns two roles — Key Vault Secrets Officer for itself, so it can write the secrets it generates, and AcrPull for the kubelet — and Contributor alone cannot assign a role. A principal with Contributor only can still deploy: see [A principal that holds Contributor only](#a-principal-that-holds-contributor-only). |
 | DNS | A hostname for the deployment. Roko owns DNS and runs it in Cloudflare; you will create one record at the end. |
 
 You do not need a certificate, and you do not need to create any secret by hand.
@@ -414,6 +414,32 @@ module "roko" {
 }
 ```
 
+#### A principal that holds Contributor only
+
+The two role assignments the module makes, and the RBAC permission model on the vault, all need `Microsoft.Authorization/roleAssignments/write`. A deployment whose principal cannot get that turns both off: the vault authorizes by access policies, which are a control-plane write on the vault itself, and no registry is created, so there is no AcrPull to grant. The kubelet pulls the published images from Docker Hub as before. The external-secrets identity's read grant becomes an access policy too, so nothing is left to do by hand.
+
+```hcl
+module "roko" {
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.13"
+
+  name         = "acme-prod"
+  location     = "southcentralus"
+  ingress_host = "acme.rokolabs.ai"
+
+  storage_account_name = "acmeproduploads"
+  key_vault_name       = "acme-prod-kv"
+  postgres_server_name = "acme-prod-pg"
+
+  key_vault_authorization = "access_policy"
+  acr_enabled             = false
+
+  foundry = {
+    account_name = "acme-prod-foundry"
+    project_name = "acme-prod"
+  }
+}
+```
+
 ## Appendix A: `modules/aws` inputs
 
 ### Required
@@ -524,7 +550,7 @@ The same shape with Azure's own names. Four names are required rather than deriv
 | `ingress_host` | string | Public hostname the platform serves. |
 | `api_allowed_cidrs` | list(string) | Who may reach the AKS public API server. No default, for the same reason as AWS. |
 | `storage_account_name` | string | Uploads storage account. Globally unique, 3-24 lowercase alphanumerics. |
-| `acr_name` | string | Container registry. Globally unique, 5-50 alphanumerics. |
+| `acr_name` | string | Container registry. Globally unique, 5-50 alphanumerics. Ignored when `acr_enabled` is false. |
 | `key_vault_name` | string | Key Vault. Globally unique, 3-24 alphanumerics and hyphens. |
 | `postgres_server_name` | string | PostgreSQL Flexible Server. Globally unique, lowercase. |
 | `foundry` | object | Foundry account, project and model deployments. See the table below. |
@@ -558,6 +584,7 @@ The same shape with Azure's own names. Four names are required rather than deriv
 | `restrict_origin_to_cloudflare` | bool | `true` | Restricts the controller's `loadBalancerSourceRanges` to Cloudflare's published ranges, read at apply time. |
 | `extra_origin_cidrs` | list(string) | `[]` | Additional CIDRs allowed to reach the load balancer. |
 | `ingress_nginx_chart_version` | string | `4.11.3` | AKS ships no load balancer controller, so the module installs the one the Ingress names. |
+| `ingress_nginx_external_traffic_policy` | string | `Cluster` | `externalTrafficPolicy` of the controller's Service. `Local` preserves the client address. The Service is patched in place, so changing it keeps the load balancer IP. |
 
 ### Images, chart and containers
 
@@ -585,7 +612,7 @@ The same shape with Azure's own names. Four names are required rather than deriv
 | `gpt_deployment_name` | string | `gpt-5.4-mini` | Deployment name entered in the model-provider form. |
 | `gpt_deployment_sku` | string | `GlobalStandard` | Deployment type. |
 | `gpt_deployment_capacity` | number | `24000` | Input-token quota, thousands per minute. |
-| `gpt_model_version` | string | `null` | Null lets Azure serve the current default version. |
+| `gpt_model_version` | string | `null` | Null lets Azure serve the current default version. A pinned version also turns off auto-upgrade, so Azure holds it until this value changes. |
 | `claude_enabled` | bool | `false` | Leave false. Applying it accepts the Anthropic Marketplace terms for the organization below. |
 | `claude_deployment_name`, `claude_deployment_sku`, `claude_capacity` | | `claude-sonnet-5`, `GlobalStandard`, `25` | Read only when `claude_enabled` is true. |
 | `organization_name`, `country_code`, `industry` | string | `ROKO Labs`, `US`, `technology` | Legal details for those Marketplace terms. |
@@ -594,7 +621,10 @@ The same shape with Azure's own names. Four names are required rather than deriv
 
 | Input | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `extra_secrets_officer_object_ids` | list(string) | `[]` | Principals granted Key Vault Secrets Officer on top of the Terraform principal. |
+| `key_vault_authorization` | string | `rbac` | `rbac` grants through role assignments. `access_policy` grants through vault access policies, which Contributor alone can write. Switching an existing vault needs `roleAssignments/write` in either direction, so choose before the first apply. |
+| `key_vault_soft_delete_retention_days` | number | `7` | How long a deleted vault, and a deleted secret in it, can be recovered. 7 to 90. |
+| `acr_enabled` | bool | `true` | Create the container registry and grant the kubelet AcrPull on it. Off for a deployment that pulls the published images from Docker Hub. |
+| `extra_secrets_officer_object_ids` | list(string) | `[]` | Principals granted full secret access (Key Vault Secrets Officer under `rbac`, an access policy under `access_policy`) on top of the Terraform principal. |
 | `tags` | map(string) | `{}` | Added to every taggable resource. |
 
 ## Appendix D: `modules/azure` outputs
@@ -613,5 +643,5 @@ The names match `modules/aws` wherever the thing behind them matches, so a calle
 | `tls_secret_id` | The Secret to drop a certificate into. Null unless `tls_mode` is `provided`. |
 | `origin_allowed_cidrs` | The Cloudflare ranges this apply allowed. |
 | `platform_version` | The release this module deploys. |
-| `acr_login_server` | Registry a lane that builds its own images pushes to. |
+| `acr_login_server` | Registry a lane that builds its own images pushes to. Null when `acr_enabled` is false. |
 | `foundry_openai_endpoint`, `foundry_gpt_deployment_name` | The two values a person pastes into Settings, Models, beside an account API key. |

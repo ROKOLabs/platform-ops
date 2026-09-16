@@ -115,7 +115,10 @@ resource "azurerm_cognitive_deployment" "gpt" {
     capacity = var.gpt_deployment_capacity
   }
 
-  version_upgrade_option = "OnceNewDefaultVersionAvailable"
+  # A pinned version holds until this configuration changes it. Left on
+  # auto-upgrade, Azure would move the deployment off the pin at the next
+  # default change and the following plan would move it back.
+  version_upgrade_option = var.gpt_model_version != null ? "NoAutoUpgrade" : "OnceNewDefaultVersionAvailable"
   rai_policy_name        = "Microsoft.DefaultV2"
 
   depends_on = [azapi_resource.project]

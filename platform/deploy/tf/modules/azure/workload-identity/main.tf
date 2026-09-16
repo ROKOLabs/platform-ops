@@ -94,3 +94,18 @@ resource "azurerm_federated_identity_credential" "external_secrets" {
 #   role_definition_name = "Key Vault Secrets User"
 #   principal_id         = azurerm_user_assigned_identity.external_secrets.principal_id
 # }
+
+# Under `access_policy` the read grant is a control-plane write on the vault,
+# which the deploy principal is allowed to make, so nothing is manual on that
+# path.
+data "azurerm_client_config" "current" {}
+
+resource "azurerm_key_vault_access_policy" "external_secrets" {
+  count = var.key_vault_authorization == "access_policy" ? 1 : 0
+
+  key_vault_id = var.key_vault_id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = azurerm_user_assigned_identity.external_secrets.principal_id
+
+  secret_permissions = ["Get", "List"]
+}

@@ -94,8 +94,20 @@ variable "storage_account_name" {
 }
 
 variable "acr_name" {
-  description = "Container registry. Globally unique, 5-50 alphanumerics."
+  description = "Container registry. Globally unique, 5-50 alphanumerics. Ignored when `acr_enabled` is false."
   type        = string
+  default     = ""
+}
+
+variable "acr_enabled" {
+  description = "Create the container registry and grant the kubelet AcrPull on it. A deployment that pulls the published images from Docker Hub needs neither, and the grant is a role assignment a Contributor-only principal cannot make."
+  type        = bool
+  default     = true
+
+  validation {
+    condition     = !var.acr_enabled || var.acr_name != ""
+    error_message = "acr_name is required when acr_enabled is true."
+  }
 }
 
 variable "key_vault_name" {
@@ -137,6 +149,17 @@ variable "ingress_nginx_chart_version" {
   description = "ingress-nginx chart version. The AKS path has no cloud load balancer controller of its own, so the module installs the controller the Ingress names."
   type        = string
   default     = "4.11.3"
+}
+
+variable "ingress_nginx_external_traffic_policy" {
+  description = "externalTrafficPolicy of the controller's LoadBalancer Service. `Cluster` is the chart's default. `Local` preserves the client address at the cost of an uneven spread across nodes; the Service is patched in place, so changing it keeps the load balancer IP."
+  type        = string
+  default     = "Cluster"
+
+  validation {
+    condition     = contains(["Cluster", "Local"], var.ingress_nginx_external_traffic_policy)
+    error_message = "ingress_nginx_external_traffic_policy must be \"Cluster\" or \"Local\"."
+  }
 }
 
 # ── Images and chart ─────────────────────────────────────────────────────────
@@ -219,8 +242,30 @@ variable "foundry" {
 
 # ── Misc ─────────────────────────────────────────────────────────────────────
 
+variable "key_vault_authorization" {
+  description = "How the vault authorizes. `rbac` grants through role assignments and needs Microsoft.Authorization/roleAssignments/write from the principal applying the module. `access_policy` grants through vault access policies, which Contributor alone can write. Switching an existing vault between the two needs roleAssignments/write in either direction, so choose before the first apply."
+  type        = string
+  default     = "rbac"
+
+  validation {
+    condition     = contains(["rbac", "access_policy"], var.key_vault_authorization)
+    error_message = "key_vault_authorization must be \"rbac\" or \"access_policy\"."
+  }
+}
+
+variable "key_vault_soft_delete_retention_days" {
+  description = "How long a deleted vault, and a deleted secret in it, can be recovered. 7 to 90. Seven is Azure's minimum and keeps the name-reservation trap short; a deployment holding secrets seeded by hand may want longer."
+  type        = number
+  default     = 7
+
+  validation {
+    condition     = var.key_vault_soft_delete_retention_days >= 7 && var.key_vault_soft_delete_retention_days <= 90
+    error_message = "key_vault_soft_delete_retention_days must be between 7 and 90."
+  }
+}
+
 variable "extra_secrets_officer_object_ids" {
-  description = "Additional principals granted Key Vault Secrets Officer, on top of the Terraform principal."
+  description = "Additional principals granted full secret access (Key Vault Secrets Officer under `rbac`, an access policy under `access_policy`), on top of the Terraform principal."
   type        = list(string)
   default     = []
 }

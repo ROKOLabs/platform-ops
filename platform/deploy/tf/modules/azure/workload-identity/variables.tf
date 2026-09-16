@@ -26,6 +26,12 @@ variable "key_vault_id" {
   type        = string
 }
 
+variable "key_vault_authorization" {
+  description = "The vault's permission model, `rbac` or `access_policy`. Under `access_policy` this module grants the external-secrets identity read access itself."
+  type        = string
+  default     = "rbac"
+}
+
 variable "service_namespace" {
   description = "Namespace of the roko-api ServiceAccount."
   type        = string

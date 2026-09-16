@@ -91,6 +91,12 @@ module "roko" {
   key_vault_name       = "acme-prod-kv"    # CHANGE ME
   postgres_server_name = "acme-prod-pg"    # CHANGE ME
 
+  # A principal with Contributor only cannot assign roles. These two turn off
+  # everything that needs one; see the setup guide. Decide before the first
+  # apply: switching an existing vault's permission model needs the same right.
+  # key_vault_authorization = "access_policy"
+  # acr_enabled             = false
+
   foundry = {
     account_name = "acme-prod-foundry" # CHANGE ME
     project_name = "acme-prod"         # CHANGE ME

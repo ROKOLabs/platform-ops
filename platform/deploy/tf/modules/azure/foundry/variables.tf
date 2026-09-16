@@ -142,7 +142,7 @@ variable "gpt_deployment_capacity" {
 }
 
 variable "gpt_model_version" {
-  description = "Model version for the GPT deployment. Null lets Azure serve the current default version."
+  description = "Model version for the GPT deployment. A pinned version also sets versionUpgradeOption to NoAutoUpgrade, so Azure holds it until this value changes. Null lets Azure select and roll the model's current default version."
   type        = string
   default     = null
 }
