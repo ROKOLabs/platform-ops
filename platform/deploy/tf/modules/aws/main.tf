@@ -412,6 +412,50 @@ resource "aws_iam_role_policy" "api_checkpoints" {
   policy = data.aws_iam_policy_document.api_checkpoints.json
 }
 
+# The settings API lists the models each Bedrock endpoint exposes and sends a
+# small inference request when an operator tests one. Native Bedrock and Mantle
+# expose separate model-list APIs, so the API needs both read paths in addition
+# to the shared inference policy below. List and availability actions do not
+# support resource-level permissions.
+data "aws_iam_policy_document" "api_bedrock" {
+  source_policy_documents = [data.aws_iam_policy_document.bedrock_inference.json]
+
+  statement {
+    actions = [
+      "bedrock:GetFoundationModel",
+      "bedrock:GetFoundationModelAvailability",
+      "bedrock:GetInferenceProfile",
+      "bedrock:ListFoundationModels",
+      "bedrock:ListInferenceProfiles",
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    actions = [
+      "bedrock-mantle:CreateInference",
+      "bedrock-mantle:GetModel",
+      "bedrock-mantle:GetProject",
+      "bedrock-mantle:ListModels",
+      "bedrock-mantle:ListProjects",
+    ]
+    resources = ["arn:aws:bedrock-mantle:*:${data.aws_caller_identity.current.account_id}:project/*"]
+  }
+
+  # The token generator signs a short-lived bearer token from the pod's AWS
+  # credentials. AWS authorizes that bearer request separately from inference.
+  statement {
+    actions   = ["bedrock-mantle:CallWithBearerToken"]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_role_policy" "api_bedrock" {
+  name   = "bedrock-discover-and-invoke"
+  role   = aws_iam_role.api.id
+  policy = data.aws_iam_policy_document.api_bedrock.json
+}
+
 resource "aws_eks_pod_identity_association" "api" {
   cluster_name    = module.cluster.cluster_name
   namespace       = kubernetes_namespace_v1.service.metadata[0].name
@@ -424,7 +468,7 @@ resource "aws_eks_pod_identity_association" "api" {
 # so that is all this grants: no uploads bucket, no Secrets Manager, nothing the
 # API can touch. The MCP token and the GitHub credential are injected as env at
 # launch, never carried by this role.
-data "aws_iam_policy_document" "agent_bedrock" {
+data "aws_iam_policy_document" "bedrock_inference" {
   statement {
     actions = [
       "bedrock:InvokeModel",
@@ -491,7 +535,7 @@ resource "aws_iam_role" "agent" {
 resource "aws_iam_role_policy" "agent_bedrock" {
   name   = "bedrock-invoke"
   role   = aws_iam_role.agent.id
-  policy = data.aws_iam_policy_document.agent_bedrock.json
+  policy = data.aws_iam_policy_document.bedrock_inference.json
 }
 
 resource "aws_iam_role_policy" "agent_checkpoints" {

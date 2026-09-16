@@ -218,7 +218,7 @@ variable "artifact_cors_origins" {
 # ── Agents ───────────────────────────────────────────────────────────────────
 
 variable "agent_bedrock_model_arns" {
-  description = "Bedrock model and inference-profile ARNs the agent role may invoke. The model catalogue changes at the speed of vendor releases, so the default covers any model in the account; the boundary doing the work is the run's isolated namespace."
+  description = "Bedrock model and inference-profile ARNs the agent and API roles may invoke. The model catalogue changes at the speed of vendor releases, so the default covers any model in the account; the boundary doing the work is the run's isolated namespace."
   type        = list(string)
   default = [
     "arn:aws:bedrock:*::foundation-model/*",

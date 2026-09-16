@@ -26,6 +26,16 @@ variable "key_vault_id" {
   type        = string
 }
 
+variable "foundry_account_id" {
+  description = "Scope for the API identity's Foundry User grant."
+  type        = string
+}
+
+variable "subscription_id" {
+  description = "Azure subscription that contains the Foundry User built-in role definition."
+  type        = string
+}
+
 variable "key_vault_authorization" {
   description = "The vault's permission model, `rbac` or `access_policy`. Under `access_policy` this module grants the external-secrets identity read access itself."
   type        = string
