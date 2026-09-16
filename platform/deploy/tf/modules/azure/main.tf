@@ -154,6 +154,8 @@ module "workload_identity" {
   oidc_issuer_url     = module.aks.oidc_issuer_url
   storage_account_id  = module.storage.account_id
   key_vault_id        = module.keyvault.vault_id
+  foundry_account_id  = module.foundry.account_id
+  subscription_id     = data.azurerm_client_config.current.subscription_id
   tags                = local.tags
 
   key_vault_authorization = var.key_vault_authorization
@@ -383,6 +385,10 @@ locals {
       # rejects the object id with AADSTS700016.
       workloadIdentity = { clientId = module.workload_identity.api_client_id }
 
+      # The account id is not a credential. The API authenticates to its data
+      # plane with the workload identity above.
+      foundry = { accountId = module.foundry.account_id }
+
       # This dedicated identity lets roko-api authenticate to Azure DevOps
       # Boards without a stored PAT. An Azure DevOps organization administrator
       # still grants the identity its project permissions after the apply.
@@ -401,7 +407,8 @@ locals {
 
       secretEncryption = { secretName = azurerm_key_vault_secret.secret_encryption.name }
 
-      # Bedrock is unreachable from AKS: the pod has no AWS identity.
+      # Bedrock is unreachable from AKS: the pod has no AWS identity. Foundry
+      # discovery and model tests use the ambient workload identity.
       modelProviders = { allowedKinds = "azure-openai" }
 
       agents = {

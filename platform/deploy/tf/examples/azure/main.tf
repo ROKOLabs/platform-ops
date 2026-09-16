@@ -58,7 +58,7 @@ provider "helm" {
 }
 
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.13"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.15"
 
   name         = "acme-prod" # CHANGE ME
   location     = "southcentralus"
@@ -91,9 +91,9 @@ module "roko" {
   key_vault_name       = "acme-prod-kv"    # CHANGE ME
   postgres_server_name = "acme-prod-pg"    # CHANGE ME
 
-  # A principal with Contributor only cannot assign roles. These two turn off
-  # everything that needs one; see the setup guide. Decide before the first
-  # apply: switching an existing vault's permission model needs the same right.
+  # These two options avoid the Key Vault and ACR role assignments. The module
+  # still assigns Foundry User to the API identity, so the Terraform principal
+  # always needs roleAssignments/write; see the setup guide.
   # key_vault_authorization = "access_policy"
   # acr_enabled             = false
 
@@ -104,11 +104,12 @@ module "roko" {
   }
 }
 
-# The two values Ops needs to create the DNS record, the two a person pastes
-# into Settings, Models, and the two an Azure DevOps administrator needs to
-# identify the managed identity.
+# The two values Ops needs to create the DNS record, the Foundry values used by
+# the platform and manual model-provider setup, and the two values an Azure
+# DevOps administrator needs to identify the managed identity.
 output "hostname" { value = module.roko.hostname }
 output "ingress_hostname" { value = module.roko.ingress_hostname }
+output "foundry_account_id" { value = module.roko.foundry_account_id }
 output "foundry_openai_endpoint" { value = module.roko.foundry_openai_endpoint }
 output "foundry_gpt_deployment_name" { value = module.roko.foundry_gpt_deployment_name }
 output "tickets_identity_client_id" { value = module.roko.tickets_identity_client_id }

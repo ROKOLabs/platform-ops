@@ -55,7 +55,7 @@ piece Terraform does not create: you add one record to it at the end.
 | --- | --- |
 | Terraform | 1.11 or newer. |
 | AWS | An account, and the `aws` CLI signed in with permission to create VPCs, EKS clusters, RDS instances, S3 buckets, IAM roles and Secrets Manager secrets. |
-| Azure | A subscription, and the `az` CLI signed in with Owner, or Contributor plus User Access Administrator. The module assigns two roles — Key Vault Secrets Officer for itself, so it can write the secrets it generates, and AcrPull for the kubelet — and Contributor alone cannot assign a role. A principal with Contributor only can still deploy: see [A principal that holds Contributor only](#a-principal-that-holds-contributor-only). |
+| Azure | A subscription, and the `az` CLI signed in with Owner, or Contributor plus Role Based Access Control Administrator. A first apply needs these rights at subscription scope because the module creates its resource group and Foundry account. The module grants Foundry User to the API identity so model discovery and tests use ambient authentication. |
 | DNS | A hostname for the deployment. Roko owns DNS and runs it in Cloudflare; you will create one record at the end. |
 
 You do not need a certificate, and you do not need to create any secret by hand.
@@ -71,7 +71,7 @@ local, which is why it is separate.
 
 ```hcl
 module "tf_backend" {
-  source      = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws/tf-backend?ref=0.0.13"
+  source      = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws/tf-backend?ref=0.0.15"
   bucket_name = "acme-prod-tfstate"
 }
 ```
@@ -193,10 +193,11 @@ az aks get-credentials --resource-group "$(terraform output -raw resource_group_
 kubectl get pods -n service
 ```
 
-On Azure, finish by pasting `foundry_openai_endpoint` and
-`foundry_gpt_deployment_name` into Settings, Models, beside an account API key.
-Bedrock is unreachable from AKS, so `azure-openai` is the provider kind that
-deployment serves.
+The module passes the Azure Foundry account ID to the API and grants its managed
+identity Foundry User. Settings, Models can therefore list and test deployments
+without an account API key. The `foundry_openai_endpoint` and
+`foundry_gpt_deployment_name` outputs remain available for configuring a stored
+Azure OpenAI provider.
 
 The Azure module also creates a dedicated `${name}-tickets` managed identity
 and passes its client ID to the API through Helm. Give an Azure DevOps
@@ -251,7 +252,7 @@ such a deployment also sets `restrict_origin_to_cloudflare = false`.
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.13"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.15"
 
   name         = "acme-prod"
   region       = "us-east-1"
@@ -279,7 +280,7 @@ module "roko" {
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.13"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.15"
 
   name         = "acme-prod"
   region       = "us-east-1"
@@ -299,7 +300,7 @@ A deployment migrating off hand-written Terraform states the names it already ha
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.13"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.15"
 
   name         = "rokolabs-dev"
   region       = "us-east-1"
@@ -331,7 +332,7 @@ The only supported override of the version constant. It changes the images, neve
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.13"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.15"
 
   name         = "rokolabs-dev"
   region       = "us-east-1"
@@ -361,7 +362,7 @@ Memory limits each node to one agent, so the node ceiling and the agent concurre
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.13"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.15"
 
   name         = "acme-prod"
   location     = "southcentralus"
@@ -393,7 +394,7 @@ module "roko" {
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.13"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.15"
 
   name         = "acme-prod"
   location     = "southcentralus"
@@ -414,13 +415,16 @@ module "roko" {
 }
 ```
 
-#### A principal that holds Contributor only
+#### Limit Azure role assignments
 
-The two role assignments the module makes, and the RBAC permission model on the vault, all need `Microsoft.Authorization/roleAssignments/write`. A deployment whose principal cannot get that turns both off: the vault authorizes by access policies, which are a control-plane write on the vault itself, and no registry is created, so there is no AcrPull to grant. The kubelet pulls the published images from Docker Hub as before. The external-secrets identity's read grant becomes an access policy too, so nothing is left to do by hand.
+Every Azure deployment grants Foundry User to the API identity, so the Terraform
+principal always needs `Microsoft.Authorization/roleAssignments/write`. The
+following options remove the separate Key Vault and ACR role assignments. They
+do not remove the Foundry requirement.
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.13"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.15"
 
   name         = "acme-prod"
   location     = "southcentralus"
@@ -510,7 +514,7 @@ Every name defaults to one derived from `name`, which is what a new deployment w
 | Input | Type | Default | Purpose |
 | --- | --- | --- | --- |
 | `artifact_cors_origins` | list(string) | `[]` | Browser origins allowed to PUT/GET the uploads bucket through presigned URLs. Empty means `https://<ingress_host>` alone. |
-| `agent_bedrock_model_arns` | list(string) | any model in the account | Bedrock model and inference-profile ARNs the agent role may invoke. |
+| `agent_bedrock_model_arns` | list(string) | any model in the account | Bedrock model and inference-profile ARNs the agent and API roles may invoke. |
 | `agent_checkpoint_prefix` | string | `runs` | Key prefix run checkpoints are written under. Both IAM grants are scoped to it. |
 | `agent_checkpoint_expiration_days` | number | `30` | Backstop expiry for checkpoint objects the backend's own cleanup missed. |
 
@@ -644,4 +648,5 @@ The names match `modules/aws` wherever the thing behind them matches, so a calle
 | `origin_allowed_cidrs` | The Cloudflare ranges this apply allowed. |
 | `platform_version` | The release this module deploys. |
 | `acr_login_server` | Registry a lane that builds its own images pushes to. Null when `acr_enabled` is false. |
-| `foundry_openai_endpoint`, `foundry_gpt_deployment_name` | The two values a person pastes into Settings, Models, beside an account API key. |
+| `foundry_account_id` | Foundry account passed to the API for ambient model discovery and testing. |
+| `foundry_openai_endpoint`, `foundry_gpt_deployment_name` | Values for configuring a stored Azure OpenAI provider. |

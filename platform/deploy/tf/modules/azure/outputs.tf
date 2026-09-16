@@ -98,6 +98,11 @@ output "foundry_openai_endpoint" {
   value       = module.foundry.openai_endpoint
 }
 
+output "foundry_account_id" {
+  description = "Foundry account resource ID passed to roko-api for ambient model discovery and testing."
+  value       = module.foundry.account_id
+}
+
 output "foundry_gpt_deployment_name" {
   description = "Deployment name that goes into the same form."
   value       = module.foundry.gpt_deployment_name
