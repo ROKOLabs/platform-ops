@@ -89,8 +89,8 @@ output "platform_version" {
 }
 
 output "acr_login_server" {
-  description = "Registry a lane that builds its own images pushes to."
-  value       = module.acr.login_server
+  description = "Registry a lane that builds its own images pushes to. Null when acr_enabled is false."
+  value       = one(module.acr[*].login_server)
 }
 
 output "foundry_openai_endpoint" {

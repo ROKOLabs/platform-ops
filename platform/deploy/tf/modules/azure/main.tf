@@ -78,8 +78,23 @@ module "storage" {
   tags                       = local.tags
 }
 
+# A deployment that pulls the published images from Docker Hub has no use for a
+# registry, and the AcrPull grant below is a role assignment a Contributor-only
+# principal cannot make, so both are optional together. The moved blocks keep
+# deployments applied before they were optional on their existing registry.
+moved {
+  from = module.acr
+  to   = module.acr[0]
+}
+
+moved {
+  from = azurerm_role_assignment.kubelet_acr_pull
+  to   = azurerm_role_assignment.kubelet_acr_pull[0]
+}
+
 module "acr" {
   source = "./acr"
+  count  = var.acr_enabled ? 1 : 0
 
   name                = var.acr_name
   location            = azurerm_resource_group.this.location
@@ -90,10 +105,12 @@ module "acr" {
 module "keyvault" {
   source = "./keyvault"
 
-  name                = var.key_vault_name
-  location            = azurerm_resource_group.this.location
-  resource_group_name = azurerm_resource_group.this.name
-  tenant_id           = data.azurerm_client_config.current.tenant_id
+  name                       = var.key_vault_name
+  location                   = azurerm_resource_group.this.location
+  resource_group_name        = azurerm_resource_group.this.name
+  tenant_id                  = data.azurerm_client_config.current.tenant_id
+  authorization              = var.key_vault_authorization
+  soft_delete_retention_days = var.key_vault_soft_delete_retention_days
 
   # The Terraform principal writes the database URL and the encryption key below,
   # so it needs Secrets Officer on the vault it just created.
@@ -138,6 +155,8 @@ module "workload_identity" {
   storage_account_id  = module.storage.account_id
   key_vault_id        = module.keyvault.vault_id
   tags                = local.tags
+
+  key_vault_authorization = var.key_vault_authorization
 }
 
 module "foundry" {
@@ -168,7 +187,9 @@ module "foundry" {
 # Nodes pull images with the kubelet identity, the analog of granting the node
 # role ECR pull access on AWS.
 resource "azurerm_role_assignment" "kubelet_acr_pull" {
-  scope                = module.acr.registry_id
+  count = var.acr_enabled ? 1 : 0
+
+  scope                = module.acr[0].registry_id
   role_definition_name = "AcrPull"
   principal_id         = module.aks.kubelet_identity_object_id
 }
@@ -296,6 +317,12 @@ resource "helm_release" "ingress_nginx" {
     controller = {
       service = {
         loadBalancerSourceRanges = concat(local.origin_ipv4_cidrs, local.origin_ipv6_cidrs)
+
+        # `Local` hands the client address through to the controller, so the
+        # API and the access log see it; `Cluster` adds a node hop and hides
+        # it. The Azure load balancer still enforces the source ranges either
+        # way.
+        externalTrafficPolicy = var.ingress_nginx_external_traffic_policy
 
         # The chart sets appProtocol http/https on the two service ports, which
         # makes the Azure cloud provider build HTTP(S) probes rather than TCP
