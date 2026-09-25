@@ -371,6 +371,10 @@ grants it Network Contributor on the AKS subnet before creating or updating the
 cluster, so fresh and existing deployments use the same apply path. The applying
 principal needs permission to create a managed identity in the resource group
 and `Microsoft.Authorization/roleAssignments/write` on the AKS subnet.
+Check these permissions before an existing-cluster upgrade. Terraform may delete
+the old `agents` pool while the new subnet role assignment is being created. If
+that assignment fails, the AKS update waits, but the agent pool may already be
+gone. Terraform does not roll back a partially completed apply.
 
 On an existing deployment, the same configuration enables NAP, changes the
 cluster identity, rotates the system pool, and deletes the old `agents` pool.
