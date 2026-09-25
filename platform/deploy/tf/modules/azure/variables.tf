@@ -51,7 +51,7 @@ variable "api_allowed_cidrs" {
 }
 
 variable "zones" {
-  description = "Availability zones the node pools are spread across, and the zones the database runs in. Three rather than one: a zone is where compute comes from as well as where redundancy lives, and in a constrained region the third is often what gets a node created instead of a pod staying Pending. Empty for a region with no zones."
+  description = "Availability zones for the fixed AKS system pool and the database. NAP chooses application-node zones. Empty for a region with no zones."
   type        = list(string)
   default     = ["1", "2", "3"]
 }
@@ -66,24 +66,6 @@ variable "postgres_sku_name" {
   description = "Flexible Server SKU. Burstable (B_*) is the cheap default and cannot run a standby."
   type        = string
   default     = "B_Standard_B1ms"
-}
-
-variable "agent_node_vm_size" {
-  description = "VM size for the autoscaling agent user pool. A D4s_v5 has room for one three-CPU agent Job plus the AKS DaemonSets."
-  type        = string
-  default     = "Standard_D4s_v5"
-}
-
-variable "agent_node_min_count" {
-  description = "Minimum number of warm agent nodes."
-  type        = number
-  default     = 1
-}
-
-variable "agent_node_max_count" {
-  description = "Maximum number of autoscaled agent nodes. Memory limits each node to one agent, so this is also the concurrency ceiling."
-  type        = number
-  default     = 3
 }
 
 # ── Globally unique resource names ───────────────────────────────────────────

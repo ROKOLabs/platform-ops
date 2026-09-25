@@ -51,17 +51,14 @@ module "vnet" {
 module "aks" {
   source = "./aks"
 
-  name                 = local.resource_prefix
-  location             = azurerm_resource_group.this.location
-  resource_group_name  = azurerm_resource_group.this.name
-  kubernetes_version   = var.kubernetes_version
-  aks_subnet_id        = module.vnet.aks_subnet_id
-  api_allowed_cidrs    = var.api_allowed_cidrs
-  agent_node_vm_size   = var.agent_node_vm_size
-  agent_node_min_count = var.agent_node_min_count
-  agent_node_max_count = var.agent_node_max_count
-  zones                = var.zones
-  tags                 = local.tags
+  name                = local.resource_prefix
+  location            = azurerm_resource_group.this.location
+  resource_group_name = azurerm_resource_group.this.name
+  kubernetes_version  = var.kubernetes_version
+  aks_subnet_id       = module.vnet.aks_subnet_id
+  api_allowed_cidrs   = var.api_allowed_cidrs
+  zones               = var.zones
+  tags                = local.tags
 }
 
 # ── Data plane ───────────────────────────────────────────────────────────────
@@ -413,16 +410,7 @@ locals {
 
       agents = {
         image            = "${var.image_registry}/${var.image_names.agent}:${local.image_tag}"
-        nodePool         = "agents"
         checkpointBucket = module.storage.checkpoints_container_name
-        maxConcurrency   = var.agent_node_max_count
-
-        # A D2s_v5 exposes about 7Gi after AKS reservations, so an 8Gi agent
-        # cannot schedule there. One three-CPU agent plus the DaemonSets fits a
-        # four-vCPU, 16Gi D4s_v5, and memory keeps it to one agent per node.
-        cpu              = "3"
-        memory           = "8Gi"
-        ephemeralStorage = "8Gi"
 
         # Agent Jobs reuse the API identity, whose Storage Blob Data Contributor
         # role is scoped to this storage account.

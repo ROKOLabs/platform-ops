@@ -1,6 +1,5 @@
 output "cluster_name" { value = azurerm_kubernetes_cluster.this.name }
 output "cluster_id" { value = azurerm_kubernetes_cluster.this.id }
-output "agent_node_pool_id" { value = azurerm_kubernetes_cluster_node_pool.agents.id }
 
 # OIDC issuer that federated identity credentials trust (see workload-identity).
 output "oidc_issuer_url" { value = azurerm_kubernetes_cluster.this.oidc_issuer_url }
