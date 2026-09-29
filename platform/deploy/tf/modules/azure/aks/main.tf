@@ -1,8 +1,21 @@
-# AKS — the Azure analog of modules/eks-cluster. Two things the platform depends
-# on are turned on here: the OIDC issuer and Workload Identity, which together are
-# the direct analog of EKS Pod Identity (federate a k8s ServiceAccount to a
-# user-assigned managed identity — see modules/workload-identity). Azure CNI puts
-# pods on the VNet, matching the EKS VPC-CNI model.
+# AKS uses a fixed system pool for critical add-ons and NAP for application
+# pods, like the system and general-purpose pools in EKS Auto Mode. The cluster
+# identity needs subnet access before AKS creates NAP nodes in this custom VNet.
+resource "azurerm_user_assigned_identity" "control_plane" {
+  name                = "${var.name}-aks"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  tags                = var.tags
+}
+
+resource "azurerm_role_assignment" "control_plane_subnet" {
+  scope                            = var.aks_subnet_id
+  role_definition_name             = "Network Contributor"
+  principal_id                     = azurerm_user_assigned_identity.control_plane.principal_id
+  principal_type                   = "ServicePrincipal"
+  skip_service_principal_aad_check = true
+}
+
 resource "azurerm_kubernetes_cluster" "this" {
   name                = var.name
   location            = var.location
@@ -14,25 +27,34 @@ resource "azurerm_kubernetes_cluster" "this" {
   workload_identity_enabled = true
 
   default_node_pool {
-    name           = "system"
-    node_count     = var.node_count
-    vm_size        = var.node_vm_size
-    vnet_subnet_id = var.aks_subnet_id
+    name                         = "system"
+    node_count                   = var.node_count
+    vm_size                      = var.node_vm_size
+    vnet_subnet_id               = var.aks_subnet_id
+    only_critical_addons_enabled = true
+    temporary_name_for_rotation  = "systemtmp"
     # A zone is where compute comes from as well as where redundancy lives. In a
     # region whose capacity is tight, asking across three zones is often the
     # difference between a node being created and a pod staying Pending.
     zones = var.zones
   }
 
-  # System-assigned identity for the control plane; workloads use their own
-  # user-assigned identities via Workload Identity, never this one.
+  # The control-plane identity is separate from pod Workload Identities. Using
+  # a pre-created identity lets one apply grant subnet access before AKS starts.
   identity {
-    type = "SystemAssigned"
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.control_plane.id]
+  }
+
+  node_provisioning_profile {
+    mode               = "Auto"
+    default_node_pools = "Auto"
   }
 
   network_profile {
-    network_plugin = "azure"
-    network_policy = "azure"
+    network_plugin    = "azure"
+    network_policy    = "azure"
+    load_balancer_sku = "standard"
   }
 
   # Only pin authorized ranges when the caller supplies them; an empty list means
@@ -45,40 +67,6 @@ resource "azurerm_kubernetes_cluster" "this" {
   }
 
   tags = var.tags
-}
 
-# EKS Auto Mode gives application pods a general-purpose pool whose capacity is
-# separate from its system pool. AKS cluster autoscaling cannot choose a VM size
-# per pod, so agent runs get an explicit user pool sized for their fixed request.
-# The taint reserves this capacity for Jobs that opt in through the chart's
-# agents.nodePool value.
-resource "azurerm_kubernetes_cluster_node_pool" "agents" {
-  name                  = "agents"
-  kubernetes_cluster_id = azurerm_kubernetes_cluster.this.id
-  orchestrator_version  = var.kubernetes_version
-  vm_size               = var.agent_node_vm_size
-  vnet_subnet_id        = var.aks_subnet_id
-  mode                  = "User"
-
-  auto_scaling_enabled = true
-  node_count           = var.agent_node_min_count
-  min_count            = var.agent_node_min_count
-  max_count            = var.agent_node_max_count
-  zones                = var.zones
-
-  node_labels = {
-    "roko.dev/agent-pool" = "agents"
-  }
-  node_taints = ["roko.dev/agent-pool=agents:NoSchedule"]
-
-  tags = merge(var.tags, { Workload = "agents" })
-
-  lifecycle {
-    ignore_changes = [node_count]
-
-    precondition {
-      condition     = var.agent_node_max_count >= var.agent_node_min_count
-      error_message = "agent_node_max_count must be greater than or equal to agent_node_min_count."
-    }
-  }
+  depends_on = [azurerm_role_assignment.control_plane_subnet]
 }

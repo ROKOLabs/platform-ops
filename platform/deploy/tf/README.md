@@ -55,7 +55,7 @@ piece Terraform does not create: you add one record to it at the end.
 | --- | --- |
 | Terraform | 1.11 or newer. |
 | AWS | An account, and the `aws` CLI signed in with permission to create VPCs, EKS clusters, RDS instances, S3 buckets, IAM roles and Secrets Manager secrets. |
-| Azure | A subscription, and the `az` CLI signed in with Owner, or Contributor plus Role Based Access Control Administrator. A first apply needs these rights at subscription scope because the module creates its resource group and Foundry account. The module grants Foundry User to the API identity so model discovery and tests use ambient authentication. |
+| Azure | A subscription, and the `az` CLI signed in with Owner, or Contributor plus Role Based Access Control Administrator. A first apply needs these rights at subscription scope because the module creates its resource group and Foundry account. The module grants Foundry User to the API identity and Network Contributor to the AKS identity on the node subnet. AzureRM 4.57 or newer is required. |
 | DNS | A hostname for the deployment. Roko owns DNS and runs it in Cloudflare; you will create one record at the end. |
 
 You do not need a certificate, and you do not need to create any secret by hand.
@@ -356,9 +356,34 @@ module "roko" {
 
 ### Azure
 
-#### Sizing the agent pool
+#### AKS node auto-provisioning
 
-Memory limits each node to one agent, so the node ceiling and the agent concurrency cap move together.
+The fixed AKS system pool has two `Standard_D4s_v5` nodes and the
+`CriticalAddonsOnly=true:NoSchedule` taint. AKS node auto-provisioning (NAP)
+creates application nodes for `roko-api`, `roko-web`, and agent Jobs from its
+default node pool. The Azure chart leaves `agents.nodePool` empty so agent Jobs
+can use those nodes. The chart defaults to three concurrent Jobs, each requesting
+one CPU, 8Gi of memory, and 8Gi of ephemeral storage.
+Remove any `chart_values.api.agents.nodePool` override that still names `agents`.
+
+The cluster uses a separate user-assigned control-plane identity. Terraform
+grants it Network Contributor on the AKS subnet before creating or updating the
+cluster, so fresh and existing deployments use the same apply path. The applying
+principal needs permission to create a managed identity in the resource group
+and `Microsoft.Authorization/roleAssignments/write` on the AKS subnet.
+Check these permissions before an existing-cluster upgrade. Terraform may delete
+the old `agents` pool while the new subnet role assignment is being created. If
+that assignment fails, the AKS update waits, but the agent pool may already be
+gone. Terraform does not roll back a partially completed apply.
+
+On an existing deployment, the same configuration enables NAP, changes the
+cluster identity, rotates the system pool, and deletes the old `agents` pool.
+AzureRM does not cordon or drain pods during system-pool rotation. API and web
+pods running on the old system nodes may be interrupted while Kubernetes
+recreates them on NAP nodes. Running agent Jobs on the deleted pool are also
+interrupted. AKS control-plane components can keep using the old identity for
+several hours after the switch, so NAP node creation may be delayed. Agent runs
+that fail the backend's three-minute pod health check need a retry.
 
 ```hcl
 module "roko" {
@@ -372,10 +397,6 @@ module "roko" {
   acr_name             = "acmeprodacr"
   key_vault_name       = "acme-prod-kv"
   postgres_server_name = "acme-prod-pg"
-
-  agent_node_vm_size   = "Standard_D8s_v5"
-  agent_node_min_count = 2
-  agent_node_max_count = 6
 
   api_allowed_cidrs = ["203.0.113.0/24"]
 
@@ -417,10 +438,11 @@ module "roko" {
 
 #### Limit Azure role assignments
 
-Every Azure deployment grants Foundry User to the API identity, so the Terraform
-principal always needs `Microsoft.Authorization/roleAssignments/write`. The
-following options remove the separate Key Vault and ACR role assignments. They
-do not remove the Foundry requirement.
+Every Azure deployment grants Foundry User to the API identity and Network
+Contributor to the AKS control-plane identity, so the Terraform principal needs
+`Microsoft.Authorization/roleAssignments/write` at the Foundry account and AKS
+subnet scopes. The following options remove the separate Key Vault and ACR role
+assignments. They do not remove the Foundry or AKS subnet requirements.
 
 ```hcl
 module "roko" {
@@ -563,22 +585,19 @@ The same shape with Azure's own names. Four names are required rather than deriv
 
 | Input | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `resource_prefix` | string | `""` | Name prefix for the resources inside the group, when they should not be named after it. Empty uses `name`. It feeds the VNet and its subnets, the AKS cluster and its DNS prefix, and the three managed identities; the group itself, the `Project` tag and the origin certificate's subject stay on `name`. Every name it feeds is force-new, and the Flexible Server's delegated subnet is force-new too, so setting it on a deployment that already exists rebuilds the network, the cluster and the database. It is for a deployment that has not been applied yet, or one accepting that rebuild. |
+| `resource_prefix` | string | `""` | Name prefix for the resources inside the group, when they should not be named after it. Empty uses `name`. It feeds the VNet and its subnets, the AKS cluster and its DNS prefix, and the four managed identities; the group itself, the `Project` tag and the origin certificate's subject stay on `name`. Every name it feeds is force-new, and the Flexible Server's delegated subnet is force-new too, so setting it on a deployment that already exists rebuilds the network, the cluster and the database. It is for a deployment that has not been applied yet, or one accepting that rebuild. |
 
 ### Network and cluster
 
 | Input | Type | Default | Purpose |
 | --- | --- | --- | --- |
 | `vnet_cidr` | string | `10.0.0.0/20` | VNet address space. Cannot be changed after creation. A /20 gives AKS a /21 and Postgres a /24. |
-| `zones` | list(string) | `["1","2","3"]` | Zones the node pools are spread across, and the zones the database runs in. Three rather than one: a zone is where compute comes from as well as where redundancy lives. Empty for a region with no zones. |
+| `zones` | list(string) | `["1","2","3"]` | Zones for the fixed AKS system pool and database. Empty for a region with no zones. |
 | `high_availability` | bool | `false` | Runs a standby database in a second zone. Needs a General Purpose or Memory Optimized `postgres_sku_name`; a Burstable server cannot run a standby, and the plan refuses rather than letting Azure refuse the create. |
 | `postgres_sku_name` | string | `B_Standard_B1ms` | Flexible Server SKU. Burstable is the cheap default. |
 | `aks_subnet_cidr` | string | `""` | Subnet for AKS nodes and pods. Empty derives it from `vnet_cidr`. Set it only to match a subnet that already exists. |
 | `postgres_subnet_cidr` | string | `""` | Delegated subnet for the Flexible Server, same rule. |
 | `kubernetes_version` | string | `1.36` | AKS version. |
-| `agent_node_vm_size` | string | `Standard_D4s_v5` | VM size for the autoscaling agent pool. A D4s_v5 has room for one three-CPU agent Job plus the AKS DaemonSets. |
-| `agent_node_min_count` | number | `1` | Warm agent nodes. |
-| `agent_node_max_count` | number | `3` | Autoscale ceiling. Memory limits each node to one agent, so this is also the agent concurrency cap. |
 
 ### TLS and origin access
 

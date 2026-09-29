@@ -10,7 +10,7 @@ terraform {
   required_version = ">= 1.11"
 
   required_providers {
-    azurerm    = { source = "hashicorp/azurerm", version = "~> 4.0" }
+    azurerm    = { source = "hashicorp/azurerm", version = ">= 4.57, < 5.0" }
     azapi      = { source = "Azure/azapi", version = "~> 2.0" }
     kubernetes = { source = "hashicorp/kubernetes", version = "~> 2.35" }
     helm       = { source = "hashicorp/helm", version = "~> 3.0" }
@@ -77,8 +77,8 @@ module "roko" {
   # address running this has to be in the list.
   api_allowed_cidrs = ["203.0.113.0/24"] # CHANGE ME
 
-  # Node pools and the database are spread across these. Empty for a region with
-  # no availability zones.
+  # The fixed system pool and database use these zones. NAP chooses application
+  # node zones from the cluster's available capacity.
   zones = ["1", "2", "3"]
 
   # A standby database in a second zone. It needs a General Purpose SKU, so
@@ -91,9 +91,9 @@ module "roko" {
   key_vault_name       = "acme-prod-kv"    # CHANGE ME
   postgres_server_name = "acme-prod-pg"    # CHANGE ME
 
-  # These two options avoid the Key Vault and ACR role assignments. The module
-  # still assigns Foundry User to the API identity, so the Terraform principal
-  # always needs roleAssignments/write; see the setup guide.
+  # These options avoid the Key Vault and ACR role assignments. The module
+  # still assigns Foundry User to the API identity and Network Contributor to
+  # the AKS identity, so Terraform needs roleAssignments/write at both scopes.
   # key_vault_authorization = "access_policy"
   # acr_enabled             = false
 
