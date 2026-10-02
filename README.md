@@ -13,8 +13,14 @@ platform. It is public, so nothing here needs a token to fetch.
 
 ## Versioning
 
-Pin by tag. The tag is the `ROKOLabs/platform` release it deploys.
+Pin by tag. The tag is the `ROKOLabs/platform` release it deploys. Use a semver tag like `0.0.21` to pin to an exact release, or use `latest` to follow the newest release automatically.
 
 ```hcl
+# Pin to a semver release
 source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.21"
+
+# Follow the newest release automatically
+source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=latest"
 ```
+
+The `latest` tag moves when a new platform release is tagged. Clients using `latest` gain weekly updates on a schedule or can pin to a semver for consistency. The module's `platform_version` output always records the semver that `latest` resolved to, so a deployment shows the exact version it is running.
