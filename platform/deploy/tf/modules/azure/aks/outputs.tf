@@ -1,6 +1,12 @@
 output "cluster_name" { value = azurerm_kubernetes_cluster.this.name }
 output "cluster_id" { value = azurerm_kubernetes_cluster.this.id }
 
+# The identity a client that grants roles itself gives Network Contributor on
+# the AKS subnet.
+output "control_plane_principal_id" {
+  value = azurerm_user_assigned_identity.control_plane.principal_id
+}
+
 # OIDC issuer that federated identity credentials trust (see workload-identity).
 output "oidc_issuer_url" { value = azurerm_kubernetes_cluster.this.oidc_issuer_url }
 

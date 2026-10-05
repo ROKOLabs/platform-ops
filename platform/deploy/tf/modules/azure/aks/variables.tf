@@ -21,6 +21,11 @@ variable "aks_subnet_id" {
   type        = string
 }
 
+variable "roles_granted_by_client" {
+  description = "null: this module creates its role assignments. A set: the client creates them by hand, and each entry names a grant already in place. The composed module documents and validates the keys."
+  type        = set(string)
+}
+
 variable "node_count" {
   type    = number
   default = 2

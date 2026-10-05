@@ -23,6 +23,12 @@ locals {
   image_tag = var.image_tag != "" ? var.image_tag : local.platform_version
 
   cors_origins = length(var.artifact_cors_origins) > 0 ? var.artifact_cors_origins : ["https://${var.ingress_host}"]
+
+  # Who creates role assignments, and whether the AKS subnet grant exists. The
+  # cluster shape and the agent Helm values follow `nap`, because NAP cannot
+  # come up before the control-plane identity can join the subnet.
+  manage_grants = var.roles_granted_by_client == null
+  nap           = local.manage_grants || contains(var.roles_granted_by_client, "aks-subnet")
 }
 
 data "azurerm_client_config" "current" {}
@@ -51,14 +57,15 @@ module "vnet" {
 module "aks" {
   source = "./aks"
 
-  name                = local.resource_prefix
-  location            = azurerm_resource_group.this.location
-  resource_group_name = azurerm_resource_group.this.name
-  kubernetes_version  = var.kubernetes_version
-  aks_subnet_id       = module.vnet.aks_subnet_id
-  api_allowed_cidrs   = var.api_allowed_cidrs
-  zones               = var.zones
-  tags                = local.tags
+  name                    = local.resource_prefix
+  location                = azurerm_resource_group.this.location
+  resource_group_name     = azurerm_resource_group.this.name
+  kubernetes_version      = var.kubernetes_version
+  aks_subnet_id           = module.vnet.aks_subnet_id
+  api_allowed_cidrs       = var.api_allowed_cidrs
+  roles_granted_by_client = var.roles_granted_by_client
+  zones                   = var.zones
+  tags                    = local.tags
 }
 
 # ── Data plane ───────────────────────────────────────────────────────────────
@@ -156,6 +163,7 @@ module "workload_identity" {
   tags                = local.tags
 
   key_vault_authorization = var.key_vault_authorization
+  manage_role_assignments = local.manage_grants
 }
 
 module "foundry" {
@@ -184,9 +192,10 @@ module "foundry" {
 }
 
 # Nodes pull images with the kubelet identity, the analog of granting the node
-# role ECR pull access on AWS.
+# role ECR pull access on AWS. A client that grants roles itself makes this
+# grant by hand; nodes cannot pull from the registry until it exists.
 resource "azurerm_role_assignment" "kubelet_acr_pull" {
-  count = var.acr_enabled ? 1 : 0
+  count = var.acr_enabled && local.manage_grants ? 1 : 0
 
   scope                = module.acr[0].registry_id
   role_definition_name = "AcrPull"
@@ -408,14 +417,29 @@ locals {
       # discovery and model tests use the ambient workload identity.
       modelProviders = { allowedKinds = "azure-openai" }
 
-      agents = {
-        image            = "${var.image_registry}/${var.image_names.agent}:${local.image_tag}"
-        checkpointBucket = module.storage.checkpoints_container_name
+      agents = merge(
+        {
+          image            = "${var.image_registry}/${var.image_names.agent}:${local.image_tag}"
+          checkpointBucket = module.storage.checkpoints_container_name
 
-        # Agent Jobs reuse the API identity, whose Storage Blob Data Contributor
-        # role is scoped to this storage account.
-        workloadIdentity = { clientId = module.workload_identity.api_client_id }
-      }
+          # A fixed pool cannot place a pod larger than its nodes, so
+          # per-project agent sizing stays off until NAP owns placement.
+          resourcesConfigurable = local.nap
+
+          # Agent Jobs reuse the API identity, whose Storage Blob Data
+          # Contributor role is scoped to this storage account.
+          workloadIdentity = { clientId = module.workload_identity.api_client_id }
+        },
+        # Before the subnet grant, Jobs pin to the fixed `agents` pool with the
+        # pre-NAP sizing: one three-CPU, 8Gi agent per D4s_v5 node.
+        local.nap ? {} : {
+          nodePool         = "agents"
+          maxConcurrency   = 3
+          cpu              = "3"
+          memory           = "8Gi"
+          ephemeralStorage = "8Gi"
+        }
+      )
     }
 
     web = {

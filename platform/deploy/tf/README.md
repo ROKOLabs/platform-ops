@@ -374,7 +374,9 @@ and `Microsoft.Authorization/roleAssignments/write` on the AKS subnet.
 Check these permissions before an existing-cluster upgrade. Terraform may delete
 the old `agents` pool while the new subnet role assignment is being created. If
 that assignment fails, the AKS update waits, but the agent pool may already be
-gone. Terraform does not roll back a partially completed apply.
+gone. Terraform does not roll back a partially completed apply. A principal
+that cannot write role assignments must not apply this configuration directly;
+follow "Clients that grant roles themselves" below instead.
 
 On an existing deployment, the same configuration enables NAP, changes the
 cluster identity, rotates the system pool, and deletes the old `agents` pool.
@@ -409,6 +411,82 @@ module "roko" {
 }
 ```
 
+#### Clients that grant roles themselves
+
+Some clients do not give the Terraform principal
+`Microsoft.Authorization/roleAssignments/write`. For them, Terraform cannot
+create any of the module's role assignments, and the apply fails at the first
+one. `roles_granted_by_client` moves every grant to the client:
+
+- `null` (the default): Terraform creates all role assignments. Most
+  deployments stay here and never set the variable.
+- A set: Terraform creates no role assignment. The client grants each row of
+  the `required_role_assignments` output by hand and records it by adding the
+  row's `key` to the set. The keys are `aks-subnet`, `foundry-user`, and
+  `acr-pull`.
+
+The `aks-subnet` key also selects the cluster shape. Azure checks the
+control-plane identity's subnet access during the cluster update itself, so
+until that grant exists the cluster keeps the pre-NAP shape: system-assigned
+identity, the fixed `agents` pool, and no node auto-provisioning. The platform
+works in that shape; model discovery answers 403 until the `foundry-user`
+grant exists, and nodes cannot pull from the registry until `acr-pull` does.
+
+Install or upgrade in two applies:
+
+1. Set `roles_granted_by_client = []` and apply. The apply succeeds without
+   creating a single role assignment, and the deployment runs in the pre-NAP
+   shape.
+2. Read what to grant: `terraform output -json required_role_assignments`.
+   Grant each row in whatever way the client uses: `az`, the portal, or its
+   own IaC. A custom role with `Microsoft.Network/virtualNetworks/subnets/read`
+   and `Microsoft.Network/virtualNetworks/subnets/join/action` on the subnet
+   satisfies the `aks-subnet` row in place of Network Contributor.
+3. Verify before moving on. The loop needs only
+   `Microsoft.Authorization/roleAssignments/read` on each scope:
+
+   ```sh
+   terraform output -json required_role_assignments | jq -c '.[]' | while read -r g; do
+     az role assignment list \
+       --assignee "$(jq -r .principal_id <<<"$g")" \
+       --scope "$(jq -r .scope <<<"$g")" \
+       --query "[?roleDefinitionName=='$(jq -r .role <<<"$g")']" -o tsv \
+     | grep -q . || echo "MISSING: $g"
+   done
+   ```
+
+   Continue when it prints nothing. A client that used a custom role for the
+   subnet sees `MISSING` for that row and checks it by hand.
+4. Set `roles_granted_by_client = ["aks-subnet", "foundry-user", "acr-pull"]`
+   (drop `acr-pull` when `acr_enabled = false`) and apply. The cluster switches
+   to the user-assigned identity, enables NAP, rotates the system pool, and
+   removes the `agents` pool. The upgrade impact in the section above applies
+   to this second apply.
+
+Rules that keep this safe:
+
+- Never remove a key. The plan then tears down what depends on it; removing
+  `aks-subnet` plans the cluster back to the pre-NAP shape.
+- Never switch a deployment from a set back to `null`. Terraform would try to
+  create grants that already exist and fail with a conflict.
+- A module upgrade that needs a new grant adds a row to
+  `required_role_assignments` and a new key. Apply, grant the new row, append
+  the key, and apply again if the output says so.
+
+**Upgrading a deployment whose state already holds grants.** A deployment
+bootstrapped by a privileged principal has `azurerm_role_assignment` resources
+in its Terraform state. Moving to a set would plan their destroy, which the
+restricted principal cannot execute. Remove them from state first; the grants
+stay in Azure, and the matching keys record them:
+
+```sh
+terraform state list | grep azurerm_role_assignment
+terraform state rm <each listed role assignment>
+```
+
+Then set the keys for every grant that exists and follow the two applies above
+for the rest.
+
 #### A certificate the deployment supplies
 
 `provided` creates the TLS Secret empty and stops managing its value, so a pipeline or a person can drop a real certificate into the name `tls_secret_id` reports.
@@ -442,7 +520,9 @@ Every Azure deployment grants Foundry User to the API identity and Network
 Contributor to the AKS control-plane identity, so the Terraform principal needs
 `Microsoft.Authorization/roleAssignments/write` at the Foundry account and AKS
 subnet scopes. The following options remove the separate Key Vault and ACR role
-assignments. They do not remove the Foundry or AKS subnet requirements.
+assignments. They do not remove the Foundry or AKS subnet requirements; a
+principal without `roleAssignments/write` anywhere follows "Clients that grant
+roles themselves" above instead.
 
 ```hcl
 module "roko" {
@@ -644,6 +724,7 @@ The same shape with Azure's own names. Four names are required rather than deriv
 
 | Input | Type | Default | Purpose |
 | --- | --- | --- | --- |
+| `roles_granted_by_client` | set(string) | `null` | `null`: Terraform creates the module's role assignments. A set: the client creates them by hand, and each entry names a `required_role_assignments` row that is in place (`aks-subnet`, `foundry-user`, `acr-pull`). Without `aks-subnet` the cluster keeps the pre-NAP shape. See "Clients that grant roles themselves". |
 | `key_vault_authorization` | string | `rbac` | `rbac` grants through role assignments. `access_policy` grants through vault access policies, which Contributor alone can write. Switching an existing vault needs `roleAssignments/write` in either direction, so choose before the first apply. |
 | `key_vault_soft_delete_retention_days` | number | `7` | How long a deleted vault, and a deleted secret in it, can be recovered. 7 to 90. |
 | `acr_enabled` | bool | `true` | Create the container registry and grant the kubelet AcrPull on it. Off for a deployment that pulls the published images from Docker Hub. |
@@ -667,5 +748,7 @@ The names match `modules/aws` wherever the thing behind them matches, so a calle
 | `origin_allowed_cidrs` | The Cloudflare ranges this apply allowed. |
 | `platform_version` | The release this module deploys. |
 | `acr_login_server` | Registry a lane that builds its own images pushes to. Null when `acr_enabled` is false. |
+| `aks_control_plane_principal_id` | Principal ID of the AKS control-plane identity, for the client that grants it subnet access itself. |
+| `required_role_assignments` | Every role assignment the deployment needs, as `{key, purpose, principal_id, role, scope}` rows. Terraform creates them when `roles_granted_by_client` is null; the client creates them otherwise. |
 | `foundry_account_id` | Foundry account passed to the API for ambient model discovery and testing. |
 | `foundry_openai_endpoint`, `foundry_gpt_deployment_name` | Values for configuring a stored Azure OpenAI provider. |
