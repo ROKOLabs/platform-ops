@@ -438,7 +438,9 @@ Upgrade in two applies:
 
 1. Set `roles_granted_by_client = []` and apply. The deployment keeps running
    in the pre-NAP shape, and the apply creates the control-plane identity
-   without touching role assignments.
+   without touching role assignments. On an existing deployment this apply
+   also rotates the system pool to `Standard_D4s_v5`; that resize needs no
+   role assignment.
 2. Read what to grant: `terraform output -json required_role_assignments`.
    The example root re-exports this output. A root copied before it existed
    adds one line first:

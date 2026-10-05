@@ -14,7 +14,7 @@ locals {
 }
 
 # The identity exists in every mode, so its name and every reference to it stay
-# inside the module and a `pending` client can grant before switching modes.
+# inside the module, and a client can grant on it before adding the key.
 resource "azurerm_user_assigned_identity" "control_plane" {
   name                = "${var.name}-aks"
   location            = var.location
