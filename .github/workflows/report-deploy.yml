@@ -1,0 +1,22 @@
+name: report-deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    name: Report main publication to Roko
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Report the deploy
+        uses: ROKOLabs/platform-ops/platform/feature/pipeline/deploy-reporting/wrappers/github@0.0.1
+        with:
+          url: https://platform.dev.rokolabs.ai/api/deploys
+          token: ${{ secrets.ROKO_DEPLOY_TOKEN }}
+          environment: prod
