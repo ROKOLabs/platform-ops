@@ -24,9 +24,9 @@ locals {
 
   cors_origins = length(var.artifact_cors_origins) > 0 ? var.artifact_cors_origins : ["https://${var.ingress_host}"]
 
-  # Who creates role assignments, and whether the AKS subnet grant exists. The
-  # cluster shape and the agent Helm values follow `nap`, because NAP cannot
-  # come up before the control-plane identity can join the subnet.
+  # Whether Terraform creates the AKS subnet grant, and whether that grant
+  # exists. The cluster shape and the agent Helm values follow `nap`, because
+  # NAP cannot come up before the control-plane identity can join the subnet.
   manage_grants = var.roles_granted_by_client == null
   nap           = local.manage_grants || contains(var.roles_granted_by_client, "aks-subnet")
 }
@@ -163,7 +163,6 @@ module "workload_identity" {
   tags                = local.tags
 
   key_vault_authorization = var.key_vault_authorization
-  manage_role_assignments = local.manage_grants
 }
 
 module "foundry" {
@@ -192,10 +191,9 @@ module "foundry" {
 }
 
 # Nodes pull images with the kubelet identity, the analog of granting the node
-# role ECR pull access on AWS. A client that grants roles itself makes this
-# grant by hand; nodes cannot pull from the registry until it exists.
+# role ECR pull access on AWS.
 resource "azurerm_role_assignment" "kubelet_acr_pull" {
-  count = var.acr_enabled && local.manage_grants ? 1 : 0
+  count = var.acr_enabled ? 1 : 0
 
   scope                = module.acr[0].registry_id
   role_definition_name = "AcrPull"

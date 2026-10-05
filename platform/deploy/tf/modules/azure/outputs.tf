@@ -56,34 +56,16 @@ output "aks_control_plane_principal_id" {
 }
 
 output "required_role_assignments" {
-  description = "Every role assignment the deployment needs. Terraform creates them when `roles_granted_by_client` is null. Otherwise the client grants each row and adds its `key` to `roles_granted_by_client`."
-  value = concat(
-    [
-      {
-        key          = "aks-subnet"
-        purpose      = "The AKS control plane joins NAP nodes to the subnet"
-        principal_id = module.aks.control_plane_principal_id
-        role         = "Network Contributor"
-        scope        = module.vnet.aks_subnet_id
-      },
-      {
-        key          = "foundry-user"
-        purpose      = "The API identity discovers and invokes Foundry model deployments"
-        principal_id = module.workload_identity.api_principal_id
-        role         = "Foundry User"
-        scope        = module.foundry.account_id
-      },
-    ],
-    var.acr_enabled ? [
-      {
-        key          = "acr-pull"
-        purpose      = "The kubelet identity pulls images from the registry"
-        principal_id = module.aks.kubelet_identity_object_id
-        role         = "AcrPull"
-        scope        = module.acr[0].registry_id
-      },
-    ] : [],
-  )
+  description = "Role assignments the client grants itself when `roles_granted_by_client` is a set; Terraform creates them when it is null. Grant each row, then add its `key` to `roles_granted_by_client`."
+  value = [
+    {
+      key          = "aks-subnet"
+      purpose      = "The AKS control plane joins NAP nodes to the subnet"
+      principal_id = module.aks.control_plane_principal_id
+      role         = "Network Contributor"
+      scope        = module.vnet.aks_subnet_id
+    },
+  ]
 }
 
 output "tickets_identity_client_id" {

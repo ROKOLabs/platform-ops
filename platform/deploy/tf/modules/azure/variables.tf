@@ -225,15 +225,15 @@ variable "foundry" {
 # ── Misc ─────────────────────────────────────────────────────────────────────
 
 variable "roles_granted_by_client" {
-  description = "null: Terraform creates the module's role assignments, which needs Microsoft.Authorization/roleAssignments/write (the default). A set: the client creates every grant by hand, and each entry names a row of `required_role_assignments` that is in place. Keys: `aks-subnet`, `foundry-user`, `acr-pull`. Without `aks-subnet` the cluster keeps the pre-NAP shape: system-assigned identity, the fixed `agents` pool, no node auto-provisioning. Never remove a key; the plan then tears down what depends on it. See \"Clients that grant roles themselves\" in the README."
+  description = "null: Terraform creates the AKS subnet role assignment, which needs Microsoft.Authorization/roleAssignments/write on the subnet (the default). A set: the client creates it by hand, and each entry names a row of `required_role_assignments` that is in place. The only key is `aks-subnet`; without it the cluster keeps the pre-NAP shape of system-assigned identity, fixed `agents` pool, and no node auto-provisioning. Never remove a key; the plan then tears down what depends on it. See \"Clients that grant roles themselves\" in the README."
   type        = set(string)
   default     = null
 
   validation {
     condition = var.roles_granted_by_client == null || alltrue([
-      for role in var.roles_granted_by_client : contains(["aks-subnet", "foundry-user", "acr-pull"], role)
+      for role in var.roles_granted_by_client : contains(["aks-subnet"], role)
     ])
-    error_message = "roles_granted_by_client accepts only \"aks-subnet\", \"foundry-user\", and \"acr-pull\"."
+    error_message = "roles_granted_by_client accepts only \"aks-subnet\"."
   }
 }
 

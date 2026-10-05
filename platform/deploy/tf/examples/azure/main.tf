@@ -97,9 +97,9 @@ module "roko" {
   # key_vault_authorization = "access_policy"
   # acr_enabled             = false
 
-  # When the principal applying this cannot write role assignments at all, the
-  # client grants them by hand instead. Apply once with an empty set, grant
-  # each row of `required_role_assignments`, add each row's key, and apply
+  # When the principal applying this cannot write role assignments on the AKS
+  # subnet, the client grants that access itself. Apply once with an empty set,
+  # grant each row of `required_role_assignments`, add its key, and apply
   # again. See "Clients that grant roles themselves" in the README.
   # roles_granted_by_client = []
 

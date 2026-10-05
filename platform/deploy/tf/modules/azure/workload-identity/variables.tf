@@ -36,12 +36,6 @@ variable "subscription_id" {
   type        = string
 }
 
-variable "manage_role_assignments" {
-  description = "Whether this module creates its role assignments. False means the client grants Foundry User itself; the composed module outputs what to grant."
-  type        = bool
-  default     = true
-}
-
 variable "key_vault_authorization" {
   description = "The vault's permission model, `rbac` or `access_policy`. Under `access_policy` this module grants the external-secrets identity read access itself."
   type        = string

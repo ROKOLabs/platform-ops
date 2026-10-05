@@ -41,24 +41,13 @@ resource "azurerm_federated_identity_credential" "agent" {
 
 # Read deployed models and invoke them through the Foundry data plane. Use the
 # built-in role ID because Microsoft recently renamed Azure AI User to Foundry
-# User and recommends IDs while the new name rolls out. A client that grants
-# roles itself makes this grant by hand; the API answers 403 on model discovery
-# until it exists.
+# User and recommends IDs while the new name rolls out.
 resource "azurerm_role_assignment" "api_foundry_user" {
-  count = var.manage_role_assignments ? 1 : 0
-
   scope                            = var.foundry_account_id
   role_definition_id               = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/53ca6127-db72-4b80-b1b0-d745d6d5456d"
   principal_id                     = azurerm_user_assigned_identity.api.principal_id
   principal_type                   = "ServicePrincipal"
   skip_service_principal_aad_check = true
-}
-
-# Earlier releases created the assignment without an index. Without this move,
-# a deployment that keeps it Terraform-managed would destroy and recreate it.
-moved {
-  from = azurerm_role_assignment.api_foundry_user
-  to   = azurerm_role_assignment.api_foundry_user[0]
 }
 
 # Commented out: the Terraform principal lacks Microsoft.Authorization/roleAssignments/write
