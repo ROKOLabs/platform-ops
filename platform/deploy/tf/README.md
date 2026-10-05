@@ -440,6 +440,9 @@ Upgrade in two applies:
    in the pre-NAP shape, and the apply creates the control-plane identity
    without touching role assignments.
 2. Read what to grant: `terraform output -json required_role_assignments`.
+   The example root re-exports this output. A root copied before it existed
+   adds one line first:
+   `output "required_role_assignments" { value = module.roko.required_role_assignments }`.
    Grant each row in whatever way the client uses: `az`, the portal, or its
    own IaC. A custom role with `Microsoft.Network/virtualNetworks/subnets/read`
    and `Microsoft.Network/virtualNetworks/subnets/join/action` on the subnet

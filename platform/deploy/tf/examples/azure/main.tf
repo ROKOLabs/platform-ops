@@ -120,3 +120,7 @@ output "foundry_openai_endpoint" { value = module.roko.foundry_openai_endpoint }
 output "foundry_gpt_deployment_name" { value = module.roko.foundry_gpt_deployment_name }
 output "tickets_identity_client_id" { value = module.roko.tickets_identity_client_id }
 output "tickets_identity_principal_id" { value = module.roko.tickets_identity_principal_id }
+
+# What a client that grants roles itself must grant. Terraform creates these
+# rows itself when `roles_granted_by_client` is null.
+output "required_role_assignments" { value = module.roko.required_role_assignments }
