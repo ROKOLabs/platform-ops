@@ -64,7 +64,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          highest=$(git tag --list '[0-9]*.[0-9]*.[0-9]*' | grep -v -- - | sort -V | tail -1)
+          highest=$(git tag --list | sed -nE '/^[0-9]+\.[0-9]+\.[0-9]+$/p' | sort -V | tail -n 1)
 
           if [ -z "$highest" ]; then
             highest="0.0.0"
