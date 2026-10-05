@@ -650,3 +650,62 @@ The names match `modules/aws` wherever the thing behind them matches, so a calle
 | `acr_login_server` | Registry a lane that builds its own images pushes to. Null when `acr_enabled` is false. |
 | `foundry_account_id` | Foundry account passed to the API for ambient model discovery and testing. |
 | `foundry_openai_endpoint`, `foundry_gpt_deployment_name` | Values for configuring a stored Azure OpenAI provider. |
+
+## Day two: updates and rollbacks
+
+### Following the latest release
+
+A deployment can follow the newest platform release automatically by pinning the module to `latest` instead of a semver tag.
+
+```hcl
+module "roko" {
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=latest"
+  # ... rest of the configuration
+}
+```
+
+The `latest` tag advances when a new platform release is published. Deployments using `latest` gain weekly updates on a schedule or by manual request, without editing the source.
+
+The module's `platform_version` output always states the semver that `latest` resolved to:
+
+```bash
+terraform output platform_version  # prints the semver, e.g. 0.0.22
+curl https://<deployment>/api/version  # the deployment reports the same version
+```
+
+### Pinning to an exact release
+
+To hold a deployment steady at one release, pin to the semver tag:
+
+```hcl
+module "roko" {
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.22"
+  # ... rest of the configuration
+}
+```
+
+### Rolling back
+
+To roll back to an earlier release, change the `ref` to that semver and apply again:
+
+```hcl
+module "roko" {
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.21"  # rolled back
+  # ... rest of the configuration
+}
+
+terraform apply
+```
+
+The module carries `platform_version = "0.0.21"` and the chart will upgrade (or downgrade) the Kubernetes release to match. Helm rolls the release back on the cluster if any workload fails to start.
+
+### Working with latest locally
+
+A checkout with `?ref=latest` caches the resolved module in `.terraform/modules/` after the first apply. A second local run uses the cache without re-resolving the tag. To pick up a moved `latest` tag on a local machine:
+
+```bash
+terraform get -update
+# or
+rm -rf .terraform/modules/
+terraform init
+```

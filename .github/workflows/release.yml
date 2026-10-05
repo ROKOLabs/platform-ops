@@ -1,0 +1,164 @@
+name: release
+
+# Tags the merged version and moves `latest` on push to main.
+#
+# This runs when version.tf in either AWS or Azure module is updated,
+# validates that the chart and all three images exist on Docker Hub,
+# then creates the semver tag and force-moves `latest` to the merge commit.
+#
+# Skips (stays green) when the version is not higher than the highest tag,
+# when it contains `-`, or when it's already tagged. If artifacts are missing,
+# fails and requires a re-run after the platform release publishes them.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - platform/deploy/tf/modules/*/version.tf
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Tag and move latest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version from both version.tf files
+        id: read-version
+        run: |
+          set -euo pipefail
+
+          aws_version=$(grep -oE 'platform_version = "[^"]*"' platform/deploy/tf/modules/aws/version.tf | cut -d'"' -f2)
+          azure_version=$(grep -oE 'platform_version = "[^"]*"' platform/deploy/tf/modules/azure/version.tf | cut -d'"' -f2)
+
+          echo "aws_version=$aws_version" >> "$GITHUB_OUTPUT"
+          echo "azure_version=$azure_version" >> "$GITHUB_OUTPUT"
+
+          if [ "$aws_version" != "$azure_version" ]; then
+            echo "::error::Version mismatch: AWS=$aws_version, Azure=$azure_version" >&2
+            exit 1
+          fi
+
+          # Validate version format: x.y.z (numbers only, no dashes)
+          if ! [[ "$aws_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid version format: $aws_version (expected x.y.z)" >&2
+            exit 1
+          fi
+
+          echo "Found version: $aws_version"
+
+      - name: Find highest existing tag
+        id: highest-tag
+        run: |
+          set -euo pipefail
+
+          highest=$(git tag --list | sed -nE '/^[0-9]+\.[0-9]+\.[0-9]+$/p' | sort -V | tail -n 1)
+
+          if [ -z "$highest" ]; then
+            highest="0.0.0"
+          fi
+
+          echo "highest=$highest" >> "$GITHUB_OUTPUT"
+          echo "Highest tag: $highest"
+
+      - name: Decide whether to tag
+        id: decide
+        run: |
+          set -euo pipefail
+
+          version="${{ steps.read-version.outputs.aws_version }}"
+          highest="${{ steps.highest-tag.outputs.highest }}"
+
+          # Check if version contains `-`
+          if [ "${version#*-}" != "$version" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "reason=Version contains dash (pre-release)"
+            exit 0
+          fi
+
+          # Check if version already exists
+          if git rev-parse "refs/tags/$version" >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "reason=Version $version already tagged"
+            exit 0
+          fi
+
+          # Check if version sorts higher than highest
+          if ! printf '%s\n' "$highest" "$version" | sort -V -C; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "reason=Version $version does not sort higher than $highest"
+            exit 0
+          fi
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Verify chart and images exist on Docker Hub
+        if: steps.decide.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+
+          version="${{ steps.read-version.outputs.aws_version }}"
+          registry="docker.io/rokoplatform"
+
+          echo "Verifying artifacts for version $version..."
+
+          # Check chart
+          helm show chart "oci://registry-1.docker.io/rokoplatform/roko-platform" --version "$version" >/dev/null
+          echo "✓ Chart $version exists"
+
+          # Check images
+          for image in api web agent; do
+            docker buildx imagetools inspect "$registry/$image:$version" >/dev/null
+            echo "✓ Image $image:$version exists"
+          done
+
+      - name: Tag and move latest
+        if: steps.decide.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+
+          version="${{ steps.read-version.outputs.aws_version }}"
+
+          git tag "$version" "$GITHUB_SHA"
+          git tag -f latest "$GITHUB_SHA"
+
+          git push origin "$version"
+          git push -f origin latest
+
+          echo "Tagged $GITHUB_SHA as $version and moved latest to it"
+
+      - name: Report result
+        if: always()
+        run: |
+          set -euo pipefail
+
+          version="${{ steps.read-version.outputs.aws_version }}"
+          previous_latest="${{ steps.highest-tag.outputs.highest }}"
+
+          {
+            if [ "${{ steps.decide.outputs.skip }}" = "true" ]; then
+              echo "### Skipped"
+              echo
+              echo "Reason: ${{ steps.decide.outputs.reason }}"
+            else
+              echo "### Released $version"
+              echo
+              echo "| Item | Value |"
+              echo "| --- | --- |"
+              echo "| Commit | \`${GITHUB_SHA:0:7}\` |"
+              echo "| Tag | \`$version\` |"
+              echo "| Previous latest | \`$previous_latest\` |"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
