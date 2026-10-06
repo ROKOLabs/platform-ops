@@ -257,6 +257,31 @@ variable "budget_notify_emails" {
   }
 }
 
+# ── Telemetry ────────────────────────────────────────────────────────────────
+
+variable "telemetry" {
+  description = "OpenTelemetry Collector that exports app telemetry, pod and node CPU and memory, cluster state, Postgres statistics and RDS host metrics to an OTLP endpoint. On by default, sending to `https://otlp.rokolabs.ai`, which accepts `http/protobuf` only. `protocol` is `http/protobuf` or `grpc`. `header_names` are the headers sent with every export; their values come from the `telemetry_headers_secret` secret, never from Terraform. `deployment_name` is the `roko.deployment` attribute on every signal; null means `name`."
+  type = object({
+    enabled         = optional(bool, true)
+    endpoint        = optional(string, "https://otlp.rokolabs.ai")
+    protocol        = optional(string, "http/protobuf")
+    header_names    = optional(list(string), ["api-key"])
+    deployment_name = optional(string)
+  })
+  default  = {}
+  nullable = false
+
+  validation {
+    condition     = can(regex("^https?://.+", var.telemetry.endpoint))
+    error_message = "telemetry.endpoint must be an http:// or https:// URL."
+  }
+
+  validation {
+    condition     = contains(["http/protobuf", "grpc"], var.telemetry.protocol)
+    error_message = "telemetry.protocol must be \"http/protobuf\" or \"grpc\"."
+  }
+}
+
 # ── Misc ─────────────────────────────────────────────────────────────────────
 
 variable "external_secrets_chart_version" {

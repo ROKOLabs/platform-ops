@@ -5,3 +5,4 @@ output "api_client_id" { value = azurerm_user_assigned_identity.api.client_id }
 output "tickets_client_id" { value = azurerm_user_assigned_identity.tickets.client_id }
 output "tickets_principal_id" { value = azurerm_user_assigned_identity.tickets.principal_id }
 output "external_secrets_client_id" { value = azurerm_user_assigned_identity.external_secrets.client_id }
+output "otel_gateway_client_id" { value = one(azurerm_user_assigned_identity.otel_gateway[*].client_id) }

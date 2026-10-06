@@ -124,6 +124,11 @@ and project name, and four globally unique names Azure will not let the module
 derive: `storage_account_name`, `acr_name`, `key_vault_name` and
 `postgres_server_name`.
 
+**Both** send telemetry to `https://otlp.rokolabs.ai` by default. Set
+`telemetry.deployment_name` to the deployment's client name in the Deployments
+Portal, and write the ingest key after the first apply.
+[Telemetry](#telemetry) has the details.
+
 Everything else has a default. Appendix A and Appendix C list all of it.
 
 ## 4. Apply
@@ -212,11 +217,93 @@ The administrator adds that identity to the Azure DevOps organization and
 grants its project and work-item permissions. Azure DevOps returns no secret.
 The API uses the client ID that Terraform already put in its Helm values.
 
+## Telemetry
+
+Both modules install an OpenTelemetry Collector in the `telemetry` namespace by
+default. It sends to `https://otlp.rokolabs.ai`, a Cloudflare worker that
+forwards OTLP/HTTP to New Relic. The worker accepts `http/protobuf` only.
+
+```mermaid
+flowchart LR
+    api[roko-api] -- OTLP http :4318 --> gw
+    ds[otel-node DaemonSet<br/>kubeletstats] -- OTLP grpc :4317 --> gw
+    db[(RDS or Azure PG)] -- postgresql receiver --> gw
+    host[CloudWatch via YACE sidecar<br/>or azuremonitor receiver] --> gw
+    store[(telemetry-headers<br/>Secrets Manager or Key Vault)] -- ESO --> sec[otel-headers Secret]
+    sec -- OTLP_HEADER_i --> gw
+    gw[otel-gateway Deployment<br/>k8s_cluster] -- OTLP + headers --> ep[otlp.rokolabs.ai]
+```
+
+| Signal | Source | Interval |
+| --- | --- | --- |
+| API traces, metrics and logs | The API exports OTLP to `otel-gateway`. The module sets `api.otel.endpoint` for it. | As the API sends |
+| Pod and node CPU and memory | `otel-node` DaemonSet, `kubeletstats` against its own node's kubelet. It tolerates every taint. | 60 s |
+| Kubernetes cluster state | `k8s_cluster` receiver on the gateway. | 60 s |
+| Postgres statistics | `postgresql` receiver, over TLS, as the master user. | 60 s |
+| Database host metrics, AWS | A YACE sidecar reads `AWS/RDS` from CloudWatch: CPU, freeable memory, free storage, connections, read and write latency, read and write IOPS. | 300 s |
+| Database host metrics, Azure | `azuremonitor` receiver reads the Flexible Server: CPU, memory and storage percent, active connections, read and write IOPS. | 300 s |
+
+Every signal carries `roko.deployment`. Set `telemetry.deployment_name` to the
+deployment's client name in the Deployments Portal, so the data is
+identifiable. Without it, the value is `name` on AWS and `resource_prefix` (or
+`name`) on Azure.
+
+```hcl
+telemetry = { deployment_name = "acme" }
+```
+
+**Set the ingest key after the first apply.** Terraform creates the secret but
+never holds its value. The value is JSON keyed by header name. Take the key
+from the Deployments Portal and run one of these:
+
+| Cloud | Secret | Command |
+| --- | --- | --- |
+| AWS | `<name>/telemetry-headers` in Secrets Manager, created with no value | `aws secretsmanager put-secret-value --secret-id <name>/telemetry-headers --secret-string '{"api-key":"<key from the Deployments Portal>"}'` |
+| Azure | `telemetry-headers` in the deployment's Key Vault, created as `{}` | `az keyvault secret set --vault-name <vault> --name telemetry-headers --value '{"api-key":"<key>"}'` |
+
+The `telemetry_headers_secret` output names the secret. Until the value is set,
+the `otel-gateway` pod waits in `CreateContainerConfigError` and nothing else
+is affected. External Secrets Operator then writes the `otel-headers` Secret,
+retrying with backoff and refreshing every 15 minutes, and the pod starts. A
+later change to the value reaches the collector when the pod restarts:
+`kubectl -n telemetry rollout restart deployment/otel-gateway`.
+
+The gateway reads cloud metrics under its own identity. On AWS it is the IAM
+role `<name>-otel-gateway` with CloudWatch read, bound by Pod Identity. On Azure
+it is the managed identity `<prefix>-otel-gateway` with Monitoring Reader on the
+Postgres server only, bound by workload identity. External Secrets Operator
+reads the headers secret with the grant it already has: `<name>/*` on AWS, and
+the whole vault on Azure. The node collector reads `nodes/stats` with `get`
+only, never `nodes/proxy`.
+
+**Send to a different backend.** Set `endpoint`, `protocol` and `header_names`,
+then write one JSON property per header name to the same secret.
+
+```hcl
+telemetry = {
+  endpoint     = "https://otlp.example.com:4317"
+  protocol     = "grpc"
+  header_names = ["authorization"]
+}
+```
+
+**Turn it off.** This removes the namespace, both collectors, the cloud
+identity, the headers secret, and the API's OTLP endpoint.
+
+```hcl
+telemetry = { enabled = false }
+```
+
 ## Day two
 
 **Upgrade to a new release.** Change the `?ref=` in your `source` and apply. One
 version resolves the infrastructure, the chart and the images together, so there
 is no second number to reconcile.
+
+**Upgrade to the first release with telemetry.** The next apply turns
+telemetry on with an empty headers secret. The gateway pod waits until you set
+the ingest key as [Telemetry](#telemetry) describes, and nothing else is
+affected. Set `telemetry = { enabled = false }` to opt out instead.
 
 **Override something the module does not expose.** Pass `chart_values`. It is
 handed to Helm as a second values document, so the merge is deep and overriding
@@ -526,6 +613,12 @@ Every name defaults to one derived from `name`, which is what a new deployment w
 | `budget_notify_emails` | list(string) | `[]` | Addresses the budget alerts. Required when `monthly_budget_usd` is set. |
 | `tags` | map(string) | `{}` | Added to every taggable resource, on top of `Project` and `ManagedBy`. |
 
+### Telemetry
+
+| Input | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `telemetry` | object | `{}` | `enabled` (bool, `true`), `endpoint` (string, `https://otlp.rokolabs.ai`), `protocol` (`http/protobuf` or `grpc`, default `http/protobuf`), `header_names` (list(string), `["api-key"]`), `deployment_name` (string, default `name`). Header values come from the `telemetry_headers_secret` secret. See [Telemetry](#telemetry). |
+
 ## Appendix B: `modules/aws` outputs
 
 | Output | Purpose |
@@ -540,6 +633,8 @@ Every name defaults to one derived from `name`, which is what a new deployment w
 | `origin_allowed_cidrs` | The Cloudflare ranges this apply allowed, as `{ipv4, ipv6}`, so drift is visible in a plan. |
 | `platform_version` | The release this module deploys. |
 | `api_ecr_repository_url`, `web_ecr_repository_url`, `agent_ecr_repository_url` | Registries a lane that builds its own images pushes to. |
+| `telemetry_otlp_endpoint` | In-cluster OTLP/HTTP URL of the telemetry gateway. Null when telemetry is disabled. |
+| `telemetry_headers_secret` | `{name, arn}` of the Secrets Manager secret the ingest key goes into. Null when telemetry is disabled. |
 
 ## Appendix C: `modules/azure` inputs
 
@@ -631,6 +726,12 @@ The same shape with Azure's own names. Four names are required rather than deriv
 | `extra_secrets_officer_object_ids` | list(string) | `[]` | Principals granted full secret access (Key Vault Secrets Officer under `rbac`, an access policy under `access_policy`) on top of the Terraform principal. |
 | `tags` | map(string) | `{}` | Added to every taggable resource. |
 
+### Telemetry
+
+| Input | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `telemetry` | object | `{}` | `enabled` (bool, `true`), `endpoint` (string, `https://otlp.rokolabs.ai`), `protocol` (`http/protobuf` or `grpc`, default `http/protobuf`), `header_names` (list(string), `["api-key"]`), `deployment_name` (string, default `resource_prefix`, or `name` when that is empty). Header values come from the `telemetry_headers_secret` secret. See [Telemetry](#telemetry). |
+
 ## Appendix D: `modules/azure` outputs
 
 The names match `modules/aws` wherever the thing behind them matches, so a caller reads `db_host` and `uploads_bucket` on either cloud.
@@ -650,6 +751,8 @@ The names match `modules/aws` wherever the thing behind them matches, so a calle
 | `acr_login_server` | Registry a lane that builds its own images pushes to. Null when `acr_enabled` is false. |
 | `foundry_account_id` | Foundry account passed to the API for ambient model discovery and testing. |
 | `foundry_openai_endpoint`, `foundry_gpt_deployment_name` | Values for configuring a stored Azure OpenAI provider. |
+| `telemetry_otlp_endpoint` | In-cluster OTLP/HTTP URL of the telemetry gateway. Null when telemetry is disabled. |
+| `telemetry_headers_secret` | `{vault_name, secret_name}` of the Key Vault secret the ingest key goes into. Null when telemetry is disabled. |
 
 ## Day two: updates and rollbacks
 
