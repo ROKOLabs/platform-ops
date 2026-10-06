@@ -76,8 +76,9 @@ override_module {
 override_module {
   target = module.keyvault
   outputs = {
-    vault_id  = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/acme-test/providers/Microsoft.KeyVault/vaults/acme-test-kv"
-    vault_uri = "https://acme-test-kv.vault.azure.net/"
+    vault_id   = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/acme-test/providers/Microsoft.KeyVault/vaults/acme-test-kv"
+    vault_uri  = "https://acme-test-kv.vault.azure.net/"
+    vault_name = "acme-test-kv"
   }
 }
 
@@ -144,32 +145,59 @@ run "disabled_creates_no_telemetry" {
   }
 
   assert {
+    condition     = length(azurerm_key_vault_secret.telemetry_headers) == 0
+    error_message = "telemetry.enabled = false must not create the headers secret."
+  }
+
+  assert {
     condition     = !contains(keys(local.platform_values.api), "otel")
     error_message = "telemetry.enabled = false must not set api.otel."
   }
+
+  assert {
+    condition     = output.telemetry_otlp_endpoint == null && output.telemetry_headers_secret == null
+    error_message = "The telemetry outputs must be null when telemetry is disabled."
+  }
 }
 
-run "enabled_without_endpoint_fails" {
+run "defaults" {
   command = plan
-
-  variables {
-    telemetry = {}
-  }
-
-  expect_failures = [var.telemetry]
-}
-
-run "enabled_reads_azure_monitor" {
-  command = plan
-
-  variables {
-    telemetry         = { endpoint = "https://otlp.nr-data.net" }
-    telemetry_headers = { "api-key" = "key" }
-  }
 
   assert {
     condition     = keys(module.telemetry[0].gateway_config.exporters) == ["otlphttp"]
     error_message = "The default protocol must use the otlphttp exporter."
+  }
+
+  assert {
+    condition     = module.telemetry[0].gateway_config.exporters.otlphttp.endpoint == "https://otlp.rokolabs.ai"
+    error_message = "The default endpoint must be https://otlp.rokolabs.ai."
+  }
+
+  assert {
+    condition     = module.telemetry[0].gateway_config.exporters.otlphttp.headers == { "api-key" = "$${env:OTLP_HEADER_0}" }
+    error_message = "The default header api-key must be bound to OTLP_HEADER_0."
+  }
+
+  assert {
+    condition     = azurerm_key_vault_secret.telemetry_headers[0].name == "telemetry-headers" && azurerm_key_vault_secret.telemetry_headers[0].value == "{}"
+    error_message = "The headers secret must be telemetry-headers with an empty JSON object as its placeholder."
+  }
+
+  assert {
+    condition     = output.telemetry_headers_secret == { vault_name = "acme-test-kv", secret_name = "telemetry-headers" }
+    error_message = "telemetry_headers_secret must name the vault and the secret."
+  }
+
+  assert {
+    condition     = module.telemetry[0].gateway_manifests[0].spec.provider.azurekv == { authType = "WorkloadIdentity", vaultUrl = "https://acme-test-kv.vault.azure.net/" }
+    error_message = "The SecretStore must read the vault with workload identity."
+  }
+
+  assert {
+    condition = module.telemetry[0].gateway_manifests[1].spec.data == [
+      { secretKey = "OTLP_HEADER_0", remoteRef = { key = "telemetry-headers", property = "api-key" } },
+    ]
+    error_message = "The ExternalSecret must map property api-key of the headers secret to OTLP_HEADER_0."
   }
 
   assert {
@@ -186,4 +214,47 @@ run "enabled_reads_azure_monitor" {
     condition     = local.platform_values.api.otel.endpoint == "http://otel-gateway.telemetry.svc.cluster.local:4318"
     error_message = "api.otel.endpoint must point at the gateway when telemetry is enabled."
   }
+}
+
+run "grpc_with_two_headers" {
+  command = plan
+
+  variables {
+    telemetry = {
+      endpoint     = "https://otlp.example.com:4317"
+      protocol     = "grpc"
+      header_names = ["a", "b"]
+    }
+  }
+
+  assert {
+    condition     = keys(module.telemetry[0].gateway_config.exporters) == ["otlp"]
+    error_message = "protocol = grpc must use the otlp exporter."
+  }
+
+  assert {
+    condition = module.telemetry[0].gateway_config.exporters.otlp.headers == {
+      a = "$${env:OTLP_HEADER_0}"
+      b = "$${env:OTLP_HEADER_1}"
+    }
+    error_message = "Each header must be bound to its own OTLP_HEADER_<i> environment variable."
+  }
+
+  assert {
+    condition = module.telemetry[0].gateway_manifests[1].spec.data == [
+      { secretKey = "OTLP_HEADER_0", remoteRef = { key = "telemetry-headers", property = "a" } },
+      { secretKey = "OTLP_HEADER_1", remoteRef = { key = "telemetry-headers", property = "b" } },
+    ]
+    error_message = "The ExternalSecret must map both properties."
+  }
+}
+
+run "invalid_endpoint_fails" {
+  command = plan
+
+  variables {
+    telemetry = { endpoint = "otlp.example.com" }
+  }
+
+  expect_failures = [var.telemetry]
 }

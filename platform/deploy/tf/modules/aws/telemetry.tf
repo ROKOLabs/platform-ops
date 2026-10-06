@@ -2,8 +2,9 @@
 #
 # The shared `../telemetry` collector, plus what only AWS has: RDS host metrics
 # from CloudWatch, read by a YACE sidecar on the gateway under its own Pod
-# Identity role. `telemetry.enabled = false` removes every resource in this file
-# and the API's OTLP endpoint with them.
+# Identity role, and the Secrets Manager secret the export headers come from.
+# `telemetry.enabled = false` removes every resource in this file and the API's
+# OTLP endpoint with them.
 
 locals {
   telemetry_enabled         = var.telemetry.enabled
@@ -45,6 +46,22 @@ locals {
       }]
     }]
   })
+}
+
+# The export header values, as JSON keyed by header name, for example
+# {"api-key": "<ingest key>"}. Terraform creates the secret with no value, and
+# the operator writes it after the first apply. External Secrets Operator reads
+# it under the `${var.name}/*` grant in main.tf.
+#
+# No recovery window: the value is an ingest key the operator can mint again,
+# and a 30-day window would block turning telemetry off and on again under the
+# same name.
+resource "aws_secretsmanager_secret" "telemetry_headers" {
+  count = local.telemetry_enabled ? 1 : 0
+
+  name                    = "${var.name}/telemetry-headers"
+  recovery_window_in_days = 0
+  tags                    = local.tags
 }
 
 data "aws_iam_policy_document" "otel_gateway" {
@@ -96,7 +113,14 @@ module "telemetry" {
   deployment_name = local.telemetry_deployment_name
   endpoint        = var.telemetry.endpoint
   protocol        = var.telemetry.protocol
-  headers         = var.telemetry_headers
+  header_names    = var.telemetry.header_names
+
+  # The same store the platform chart renders on AWS: no auth block, so ESO
+  # reads with its controller's Pod Identity role.
+  headers_secret_key = aws_secretsmanager_secret.telemetry_headers[0].name
+  secret_store_provider = {
+    aws = { service = "SecretsManager", region = var.region }
+  }
 
   # RDS presents a certificate signed by the Amazon RDS CA, which the collector
   # image does not carry. The connection stays encrypted inside the VPC.
@@ -139,6 +163,10 @@ module "telemetry" {
   }
 
   # A pod admitted before its Pod Identity association exists gets no AWS
-  # credentials until it restarts.
-  depends_on = [aws_eks_pod_identity_association.otel_gateway]
+  # credentials until it restarts. The gateway release renders a SecretStore
+  # and an ExternalSecret, so the ESO CRDs must exist first.
+  depends_on = [
+    aws_eks_pod_identity_association.otel_gateway,
+    module.external_secrets,
+  ]
 }

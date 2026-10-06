@@ -113,6 +113,14 @@ output "telemetry_otlp_endpoint" {
   value       = one(module.telemetry[*].otlp_http_endpoint)
 }
 
+output "telemetry_headers_secret" {
+  description = "Key Vault secret the operator writes the telemetry export headers to, as `{vault_name, secret_name}`. Null when telemetry is disabled."
+  value = local.telemetry_enabled ? {
+    vault_name  = module.keyvault.vault_name
+    secret_name = azurerm_key_vault_secret.telemetry_headers[0].name
+  } : null
+}
+
 # The address belongs to the controller's Service, which Helm created and waited
 # for, so this read always finds one.
 data "kubernetes_service_v1" "ingress_nginx" {

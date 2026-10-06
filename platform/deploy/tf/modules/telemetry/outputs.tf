@@ -27,3 +27,13 @@ output "node_config" {
   description = "Collector config the node DaemonSet is installed with, before the chart's presets add to it."
   value       = local.node_config
 }
+
+output "gateway_manifests" {
+  description = "SecretStore and ExternalSecret the gateway release renders. Exposed for tests."
+  value       = local.gateway_manifests
+}
+
+output "headers_secret_name" {
+  description = "Kubernetes Secret ESO writes the header values to."
+  value       = local.headers_secret_name
+}

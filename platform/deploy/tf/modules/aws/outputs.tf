@@ -77,6 +77,14 @@ output "telemetry_otlp_endpoint" {
   value       = one(module.telemetry[*].otlp_http_endpoint)
 }
 
+output "telemetry_headers_secret" {
+  description = "Secrets Manager secret the operator writes the telemetry export headers to, as `{name, arn}`. Null when telemetry is disabled."
+  value = local.telemetry_enabled ? {
+    name = aws_secretsmanager_secret.telemetry_headers[0].name
+    arn  = aws_secretsmanager_secret.telemetry_headers[0].arn
+  } : null
+}
+
 # The load balancer is created by the chart's Ingress, not by Terraform, and Helm
 # does not wait for an Ingress: `wait` covers Deployments, Pods and
 # LoadBalancer Services, and returns as soon as the pods are ready, which is

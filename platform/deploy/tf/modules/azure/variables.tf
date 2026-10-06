@@ -243,33 +243,26 @@ variable "foundry" {
 # ── Telemetry ────────────────────────────────────────────────────────────────
 
 variable "telemetry" {
-  description = "OpenTelemetry Collector that exports app telemetry, pod and node CPU and memory, cluster state, Postgres statistics and Flexible Server host metrics to an OTLP endpoint. On by default with no default endpoint, so each deployment sets `endpoint` or sets `enabled = false`. `protocol` is `http/protobuf` or `grpc`. `deployment_name` is the `roko.deployment` attribute on every signal; null means `resource_prefix`, or `name` when that is empty."
+  description = "OpenTelemetry Collector that exports app telemetry, pod and node CPU and memory, cluster state, Postgres statistics and Flexible Server host metrics to an OTLP endpoint. On by default, sending to `https://otlp.rokolabs.ai`, which accepts `http/protobuf` only. `protocol` is `http/protobuf` or `grpc`. `header_names` are the headers sent with every export; their values come from the `telemetry_headers_secret` secret, never from Terraform. `deployment_name` is the `roko.deployment` attribute on every signal; null means `resource_prefix`, or `name` when that is empty."
   type = object({
     enabled         = optional(bool, true)
-    endpoint        = optional(string)
+    endpoint        = optional(string, "https://otlp.rokolabs.ai")
     protocol        = optional(string, "http/protobuf")
+    header_names    = optional(list(string), ["api-key"])
     deployment_name = optional(string)
   })
   default  = {}
   nullable = false
 
   validation {
-    condition     = !var.telemetry.enabled || var.telemetry.endpoint != null
-    error_message = "Set telemetry.endpoint (and telemetry_headers if your backend needs them), or set telemetry.enabled = false."
+    condition     = can(regex("^https?://.+", var.telemetry.endpoint))
+    error_message = "telemetry.endpoint must be an http:// or https:// URL."
   }
 
   validation {
     condition     = contains(["http/protobuf", "grpc"], var.telemetry.protocol)
     error_message = "telemetry.protocol must be \"http/protobuf\" or \"grpc\"."
   }
-}
-
-variable "telemetry_headers" {
-  description = "Headers sent with every OTLP export, for example `{ \"api-key\" = var.new_relic_license_key }`. Any names. Empty is valid for a backend without auth. The values are written to a Kubernetes Secret in the `telemetry` namespace."
-  type        = map(string)
-  default     = {}
-  sensitive   = true
-  nullable    = false
 }
 
 # ── Misc ─────────────────────────────────────────────────────────────────────

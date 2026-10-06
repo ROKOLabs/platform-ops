@@ -2,8 +2,9 @@
 #
 # The shared `../telemetry` collector, plus what only Azure has: Flexible Server
 # host metrics from Azure Monitor, read by the gateway under its own workload
-# identity (see ./workload-identity). `telemetry.enabled = false` removes every
-# resource in this file, that identity, and the API's OTLP endpoint.
+# identity (see ./workload-identity), and the Key Vault secret the export
+# headers come from. `telemetry.enabled = false` removes every resource in this
+# file, that identity, and the API's OTLP endpoint.
 
 locals {
   telemetry_enabled         = var.telemetry.enabled
@@ -26,6 +27,26 @@ locals {
   ]
 }
 
+# The export header values, as JSON keyed by header name, for example
+# {"api-key": "<ingest key>"}. Key Vault requires a value, so Terraform writes an
+# empty object and then ignores the value; the operator sets it after the first
+# apply. ESO reads it with the vault-wide grant of the external-secrets identity
+# (see ./workload-identity).
+resource "azurerm_key_vault_secret" "telemetry_headers" {
+  count = local.telemetry_enabled ? 1 : 0
+
+  name         = "telemetry-headers"
+  key_vault_id = module.keyvault.vault_id
+  value        = jsonencode({})
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+
+  # The deployer's grant on the vault must exist and have propagated.
+  depends_on = [module.keyvault]
+}
+
 module "telemetry" {
   source = "../telemetry"
   count  = local.telemetry_enabled ? 1 : 0
@@ -34,7 +55,14 @@ module "telemetry" {
   deployment_name = local.telemetry_deployment_name
   endpoint        = var.telemetry.endpoint
   protocol        = var.telemetry.protocol
-  headers         = var.telemetry_headers
+  header_names    = var.telemetry.header_names
+
+  # The same store the platform chart renders on Azure: workload identity with
+  # no serviceAccountRef, so ESO reads with its controller's identity.
+  headers_secret_key = azurerm_key_vault_secret.telemetry_headers[0].name
+  secret_store_provider = {
+    azurekv = { authType = "WorkloadIdentity", vaultUrl = module.keyvault.vault_uri }
+  }
 
   # Flexible Server presents a certificate from a public root the collector
   # image trusts, so the server is verified.
@@ -77,6 +105,11 @@ module "telemetry" {
     }
   }
 
-  # The pod should not start before its federated credential exists.
-  depends_on = [module.workload_identity]
+  # The pod should not start before its federated credential exists. The
+  # gateway release renders a SecretStore and an ExternalSecret, so the ESO
+  # CRDs must exist first.
+  depends_on = [
+    module.workload_identity,
+    module.cluster_config,
+  ]
 }

@@ -12,8 +12,13 @@ variable "deployment_name" {
 # ── Export ───────────────────────────────────────────────────────────────────
 
 variable "endpoint" {
-  description = "OTLP endpoint the gateway exports to, for example `https://otlp.nr-data.net`."
+  description = "OTLP endpoint the gateway exports to, for example `https://otlp.rokolabs.ai`."
   type        = string
+
+  validation {
+    condition     = can(regex("^https?://.+", var.endpoint))
+    error_message = "endpoint must be an http:// or https:// URL."
+  }
 }
 
 variable "protocol" {
@@ -27,11 +32,26 @@ variable "protocol" {
   }
 }
 
-variable "headers" {
-  description = "Headers sent with every export, for example `{ \"api-key\" = \"...\" }`. The values go into a Kubernetes Secret and reach the collector as environment variables, never as plain config."
-  type        = map(string)
-  default     = {}
-  sensitive   = true
+variable "header_names" {
+  description = "Headers sent with every export. Each name is a property of the JSON in the store secret `headers_secret_key`. Its value reaches the collector as OTLP_HEADER_<i>, where <i> is the name's index in this list. Empty sends no headers and renders no ESO resources."
+  type        = list(string)
+  default     = ["api-key"]
+  nullable    = false
+
+  validation {
+    condition     = length(distinct(var.header_names)) == length(var.header_names) && alltrue([for n in var.header_names : n != ""])
+    error_message = "header_names must be distinct, non-empty strings."
+  }
+}
+
+variable "headers_secret_key" {
+  description = "Name of the secret in the cloud secret store that holds the header values as JSON, for example `{\"api-key\": \"...\"}`."
+  type        = string
+}
+
+variable "secret_store_provider" {
+  description = "`spec.provider` of the SecretStore that reads `headers_secret_key`, in the shape the platform chart's SecretStore uses on that cloud. ESO authenticates with its controller identity."
+  type        = any
 }
 
 # ── Postgres ─────────────────────────────────────────────────────────────────
