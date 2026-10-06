@@ -50,6 +50,24 @@ output "checkpoints_bucket" {
   value       = module.storage.checkpoints_container_name
 }
 
+output "aks_control_plane_principal_id" {
+  description = "Principal ID of the AKS control-plane identity, for the client that grants it subnet access itself."
+  value       = module.aks.control_plane_principal_id
+}
+
+output "required_role_assignments" {
+  description = "Role assignments the client grants itself when `roles_granted_by_client` is a set; Terraform creates them when it is null. Grant each row, then add its `key` to `roles_granted_by_client`."
+  value = [
+    {
+      key          = "aks-subnet"
+      purpose      = "The AKS control plane joins NAP nodes to the subnet"
+      principal_id = module.aks.control_plane_principal_id
+      role         = "Network Contributor"
+      scope        = module.vnet.aks_subnet_id
+    },
+  ]
+}
+
 output "tickets_identity_client_id" {
   description = "Client ID passed to roko-api so it can request Azure DevOps tokens."
   value       = module.workload_identity.tickets_client_id

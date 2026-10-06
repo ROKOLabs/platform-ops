@@ -23,6 +23,12 @@ locals {
   image_tag = var.image_tag != "" ? var.image_tag : local.platform_version
 
   cors_origins = length(var.artifact_cors_origins) > 0 ? var.artifact_cors_origins : ["https://${var.ingress_host}"]
+
+  # Whether Terraform creates the AKS subnet grant, and whether that grant
+  # exists. The cluster shape and the agent Helm values follow `nap`, because
+  # NAP cannot come up before the control-plane identity can join the subnet.
+  manage_grants = var.roles_granted_by_client == null
+  nap           = local.manage_grants || contains(var.roles_granted_by_client, "aks-subnet")
 }
 
 data "azurerm_client_config" "current" {}
@@ -51,17 +57,15 @@ module "vnet" {
 module "aks" {
   source = "./aks"
 
-  name                 = local.resource_prefix
-  location             = azurerm_resource_group.this.location
-  resource_group_name  = azurerm_resource_group.this.name
-  kubernetes_version   = var.kubernetes_version
-  aks_subnet_id        = module.vnet.aks_subnet_id
-  api_allowed_cidrs    = var.api_allowed_cidrs
-  agent_node_vm_size   = var.agent_node_vm_size
-  agent_node_min_count = var.agent_node_min_count
-  agent_node_max_count = var.agent_node_max_count
-  zones                = var.zones
-  tags                 = local.tags
+  name                    = local.resource_prefix
+  location                = azurerm_resource_group.this.location
+  resource_group_name     = azurerm_resource_group.this.name
+  kubernetes_version      = var.kubernetes_version
+  aks_subnet_id           = module.vnet.aks_subnet_id
+  api_allowed_cidrs       = var.api_allowed_cidrs
+  roles_granted_by_client = var.roles_granted_by_client
+  zones                   = var.zones
+  tags                    = local.tags
 }
 
 # ── Data plane ───────────────────────────────────────────────────────────────
@@ -414,23 +418,29 @@ locals {
       # discovery and model tests use the ambient workload identity.
       modelProviders = { allowedKinds = "azure-openai" }
 
-      agents = {
-        image            = "${var.image_registry}/${var.image_names.agent}:${local.image_tag}"
-        nodePool         = "agents"
-        checkpointBucket = module.storage.checkpoints_container_name
-        maxConcurrency   = var.agent_node_max_count
+      agents = merge(
+        {
+          image            = "${var.image_registry}/${var.image_names.agent}:${local.image_tag}"
+          checkpointBucket = module.storage.checkpoints_container_name
 
-        # A D2s_v5 exposes about 7Gi after AKS reservations, so an 8Gi agent
-        # cannot schedule there. One three-CPU agent plus the DaemonSets fits a
-        # four-vCPU, 16Gi D4s_v5, and memory keeps it to one agent per node.
-        cpu              = "3"
-        memory           = "8Gi"
-        ephemeralStorage = "8Gi"
+          # A fixed pool cannot place a pod larger than its nodes, so
+          # per-project agent sizing stays off until NAP owns placement.
+          resourcesConfigurable = local.nap
 
-        # Agent Jobs reuse the API identity, whose Storage Blob Data Contributor
-        # role is scoped to this storage account.
-        workloadIdentity = { clientId = module.workload_identity.api_client_id }
-      }
+          # Agent Jobs reuse the API identity, whose Storage Blob Data
+          # Contributor role is scoped to this storage account.
+          workloadIdentity = { clientId = module.workload_identity.api_client_id }
+        },
+        # Before the subnet grant, Jobs pin to the fixed `agents` pool with the
+        # pre-NAP sizing: one three-CPU, 8Gi agent per D4s_v5 node.
+        local.nap ? {} : {
+          nodePool         = "agents"
+          maxConcurrency   = 3
+          cpu              = "3"
+          memory           = "8Gi"
+          ephemeralStorage = "8Gi"
+        }
+      )
     }
 
     web = {

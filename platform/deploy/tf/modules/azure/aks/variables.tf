@@ -17,8 +17,13 @@ variable "kubernetes_version" {
 }
 
 variable "aks_subnet_id" {
-  description = "Subnet the node pool and pods live in (Azure CNI)."
+  description = "Subnet for fixed system nodes, NAP nodes, and pods (Azure CNI)."
   type        = string
+}
+
+variable "roles_granted_by_client" {
+  description = "null: this module creates its role assignments. A set: the client creates them by hand, and each entry names a grant already in place. The composed module documents and validates the keys."
+  type        = set(string)
 }
 
 variable "node_count" {
@@ -28,35 +33,7 @@ variable "node_count" {
 
 variable "node_vm_size" {
   type    = string
-  default = "Standard_D2s_v5"
-}
-
-variable "agent_node_vm_size" {
-  description = "VM size for the autoscaling agent user pool."
-  type        = string
-  default     = "Standard_D4s_v5"
-}
-
-variable "agent_node_min_count" {
-  description = "Minimum agent nodes. Keep one warm because run health checks time out after three minutes."
-  type        = number
-  default     = 1
-
-  validation {
-    condition     = var.agent_node_min_count >= 1
-    error_message = "agent_node_min_count must be at least 1."
-  }
-}
-
-variable "agent_node_max_count" {
-  description = "Maximum agent nodes available to burst workloads."
-  type        = number
-  default     = 3
-
-  validation {
-    condition     = var.agent_node_max_count >= 1
-    error_message = "agent_node_max_count must be at least 1."
-  }
+  default = "Standard_D4s_v5"
 }
 
 variable "api_allowed_cidrs" {
@@ -66,7 +43,7 @@ variable "api_allowed_cidrs" {
 }
 
 variable "zones" {
-  description = "Availability zones both node pools are spread across. Empty for a region that has none."
+  description = "Availability zones for the fixed system pool. Empty for a region that has none."
   type        = list(string)
   default     = ["1", "2", "3"]
 }
