@@ -124,6 +124,10 @@ and project name, and four globally unique names Azure will not let the module
 derive: `storage_account_name`, `acr_name`, `key_vault_name` and
 `postgres_server_name`.
 
+**Both** need a telemetry destination, or telemetry turned off. The example
+files send to New Relic and read the license key from `TF_VAR_telemetry_api_key`.
+[Telemetry](#telemetry) has the details.
+
 Everything else has a default. Appendix A and Appendix C list all of it.
 
 ## 4. Apply
@@ -212,11 +216,70 @@ The administrator adds that identity to the Azure DevOps organization and
 grants its project and work-item permissions. Azure DevOps returns no secret.
 The API uses the client ID that Terraform already put in its Helm values.
 
+## Telemetry
+
+Both modules install an OpenTelemetry Collector in the `telemetry` namespace by
+default. It exports to any OTLP endpoint you name.
+
+```mermaid
+flowchart LR
+    api[roko-api] -- OTLP http :4318 --> gw
+    ds[otel-node DaemonSet<br/>kubeletstats] -- OTLP grpc :4317 --> gw
+    db[(RDS or Azure PG)] -- postgresql receiver --> gw
+    host[CloudWatch via YACE sidecar<br/>or azuremonitor receiver] --> gw
+    gw[otel-gateway Deployment<br/>k8s_cluster] -- OTLP + headers --> ep[telemetry.endpoint]
+```
+
+| Signal | Source | Interval |
+| --- | --- | --- |
+| API traces, metrics and logs | The API exports OTLP to `otel-gateway`. The module sets `api.otel.endpoint` for it. | As the API sends |
+| Pod and node CPU and memory | `otel-node` DaemonSet, `kubeletstats` against its own node's kubelet. It tolerates every taint. | 60 s |
+| Kubernetes cluster state | `k8s_cluster` receiver on the gateway. | 60 s |
+| Postgres statistics | `postgresql` receiver, over TLS, as the master user. | 60 s |
+| Database host metrics, AWS | A YACE sidecar reads `AWS/RDS` from CloudWatch: CPU, freeable memory, free storage, connections, read and write latency, read and write IOPS. | 300 s |
+| Database host metrics, Azure | `azuremonitor` receiver reads the Flexible Server: CPU, memory and storage percent, active connections, read and write IOPS. | 300 s |
+
+Every signal carries `roko.deployment`, which is `name` on AWS and
+`resource_prefix` (or `name`) on Azure unless `telemetry.deployment_name` sets
+it.
+
+The gateway reads cloud metrics under its own identity. On AWS it is the IAM
+role `<name>-otel-gateway` with CloudWatch read, bound by Pod Identity. On Azure
+it is the managed identity `<prefix>-otel-gateway` with Monitoring Reader on the
+Postgres server only, bound by workload identity. The node collector reads
+`nodes/stats` with `get` only, never `nodes/proxy`.
+
+**Send to New Relic.** This is what the example files do. The license key goes
+into a Kubernetes Secret, never into the collector config.
+
+```hcl
+telemetry         = { endpoint = "https://otlp.nr-data.net" }
+telemetry_headers = { "api-key" = var.telemetry_api_key }
+```
+
+Any OTLP backend works the same way. Set `protocol = "grpc"` for a gRPC
+endpoint, and pass whatever header names the backend wants.
+
+**Turn it off.** This removes the namespace, both collectors, the cloud
+identity, and the API's OTLP endpoint.
+
+```hcl
+telemetry = { enabled = false }
+```
+
+Telemetry is on with no default endpoint, so a module call that sets neither
+fails at plan with `Set telemetry.endpoint (and telemetry_headers if your
+backend needs them), or set telemetry.enabled = false.`
+
 ## Day two
 
 **Upgrade to a new release.** Change the `?ref=` in your `source` and apply. One
 version resolves the infrastructure, the chart and the images together, so there
 is no second number to reconcile.
+
+**Upgrade to the first release with telemetry.** An existing deployment fails
+at plan until it sets `telemetry.endpoint` or `telemetry = { enabled = false }`.
+This is deliberate: each deployment chooses a backend or opts out.
 
 **Override something the module does not expose.** Pass `chart_values`. It is
 handed to Helm as a second values document, so the merge is deep and overriding
@@ -526,6 +589,13 @@ Every name defaults to one derived from `name`, which is what a new deployment w
 | `budget_notify_emails` | list(string) | `[]` | Addresses the budget alerts. Required when `monthly_budget_usd` is set. |
 | `tags` | map(string) | `{}` | Added to every taggable resource, on top of `Project` and `ManagedBy`. |
 
+### Telemetry
+
+| Input | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `telemetry` | object | `{}` | `enabled` (bool, `true`), `endpoint` (string, no default), `protocol` (`http/protobuf` or `grpc`, default `http/protobuf`), `deployment_name` (string, default `name`). With `enabled` true, `endpoint` is required. See [Telemetry](#telemetry). |
+| `telemetry_headers` | map(string), sensitive | `{}` | Headers sent with every export, for example `{ "api-key" = "..." }`. Any names. Empty is valid for a backend without auth. |
+
 ## Appendix B: `modules/aws` outputs
 
 | Output | Purpose |
@@ -540,6 +610,7 @@ Every name defaults to one derived from `name`, which is what a new deployment w
 | `origin_allowed_cidrs` | The Cloudflare ranges this apply allowed, as `{ipv4, ipv6}`, so drift is visible in a plan. |
 | `platform_version` | The release this module deploys. |
 | `api_ecr_repository_url`, `web_ecr_repository_url`, `agent_ecr_repository_url` | Registries a lane that builds its own images pushes to. |
+| `telemetry_otlp_endpoint` | In-cluster OTLP/HTTP URL of the telemetry gateway. Null when telemetry is disabled. |
 
 ## Appendix C: `modules/azure` inputs
 
@@ -631,6 +702,13 @@ The same shape with Azure's own names. Four names are required rather than deriv
 | `extra_secrets_officer_object_ids` | list(string) | `[]` | Principals granted full secret access (Key Vault Secrets Officer under `rbac`, an access policy under `access_policy`) on top of the Terraform principal. |
 | `tags` | map(string) | `{}` | Added to every taggable resource. |
 
+### Telemetry
+
+| Input | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `telemetry` | object | `{}` | `enabled` (bool, `true`), `endpoint` (string, no default), `protocol` (`http/protobuf` or `grpc`, default `http/protobuf`), `deployment_name` (string, default `resource_prefix`, or `name` when that is empty). With `enabled` true, `endpoint` is required. See [Telemetry](#telemetry). |
+| `telemetry_headers` | map(string), sensitive | `{}` | Headers sent with every export, for example `{ "api-key" = "..." }`. Any names. Empty is valid for a backend without auth. |
+
 ## Appendix D: `modules/azure` outputs
 
 The names match `modules/aws` wherever the thing behind them matches, so a caller reads `db_host` and `uploads_bucket` on either cloud.
@@ -650,6 +728,7 @@ The names match `modules/aws` wherever the thing behind them matches, so a calle
 | `acr_login_server` | Registry a lane that builds its own images pushes to. Null when `acr_enabled` is false. |
 | `foundry_account_id` | Foundry account passed to the API for ambient model discovery and testing. |
 | `foundry_openai_endpoint`, `foundry_gpt_deployment_name` | Values for configuring a stored Azure OpenAI provider. |
+| `telemetry_otlp_endpoint` | In-cluster OTLP/HTTP URL of the telemetry gateway. Null when telemetry is disabled. |
 
 ## Day two: updates and rollbacks
 

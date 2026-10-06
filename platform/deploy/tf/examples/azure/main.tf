@@ -102,6 +102,20 @@ module "roko" {
     project_name = "acme-prod"         # CHANGE ME
     location     = "eastus2"
   }
+
+  # Telemetry is on by default and needs a destination. This sends it to New
+  # Relic; any OTLP endpoint works. Set `telemetry = { enabled = false }` to run
+  # without a collector.
+  telemetry         = { endpoint = "https://otlp.nr-data.net" }
+  telemetry_headers = { "api-key" = var.telemetry_api_key }
+}
+
+# The New Relic license key. Pass it with TF_VAR_telemetry_api_key or a tfvars
+# file kept out of version control, never in this file.
+variable "telemetry_api_key" {
+  description = "New Relic license key the telemetry collector sends as the `api-key` header."
+  type        = string
+  sensitive   = true
 }
 
 # The two values Ops needs to create the DNS record, the Foundry values used by
