@@ -108,6 +108,11 @@ output "foundry_gpt_deployment_name" {
   value       = module.foundry.gpt_deployment_name
 }
 
+output "telemetry_otlp_endpoint" {
+  description = "In-cluster OTLP/HTTP endpoint of the telemetry gateway. Null when telemetry is disabled."
+  value       = one(module.telemetry[*].otlp_http_endpoint)
+}
+
 # The address belongs to the controller's Service, which Helm created and waited
 # for, so this read always finds one.
 data "kubernetes_service_v1" "ingress_nginx" {

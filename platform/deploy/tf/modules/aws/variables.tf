@@ -257,6 +257,38 @@ variable "budget_notify_emails" {
   }
 }
 
+# ── Telemetry ────────────────────────────────────────────────────────────────
+
+variable "telemetry" {
+  description = "OpenTelemetry Collector that exports app telemetry, pod and node CPU and memory, cluster state, Postgres statistics and RDS host metrics to an OTLP endpoint. On by default with no default endpoint, so each deployment sets `endpoint` or sets `enabled = false`. `protocol` is `http/protobuf` or `grpc`. `deployment_name` is the `roko.deployment` attribute on every signal; null means `name`."
+  type = object({
+    enabled         = optional(bool, true)
+    endpoint        = optional(string)
+    protocol        = optional(string, "http/protobuf")
+    deployment_name = optional(string)
+  })
+  default  = {}
+  nullable = false
+
+  validation {
+    condition     = !var.telemetry.enabled || var.telemetry.endpoint != null
+    error_message = "Set telemetry.endpoint (and telemetry_headers if your backend needs them), or set telemetry.enabled = false."
+  }
+
+  validation {
+    condition     = contains(["http/protobuf", "grpc"], var.telemetry.protocol)
+    error_message = "telemetry.protocol must be \"http/protobuf\" or \"grpc\"."
+  }
+}
+
+variable "telemetry_headers" {
+  description = "Headers sent with every OTLP export, for example `{ \"api-key\" = var.new_relic_license_key }`. Any names. Empty is valid for a backend without auth. The values are written to a Kubernetes Secret in the `telemetry` namespace."
+  type        = map(string)
+  default     = {}
+  sensitive   = true
+  nullable    = false
+}
+
 # ── Misc ─────────────────────────────────────────────────────────────────────
 
 variable "external_secrets_chart_version" {

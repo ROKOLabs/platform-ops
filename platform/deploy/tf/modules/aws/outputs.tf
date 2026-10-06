@@ -72,6 +72,11 @@ output "agent_ecr_repository_url" {
   value       = module.agent_ecr.repository_url
 }
 
+output "telemetry_otlp_endpoint" {
+  description = "In-cluster OTLP/HTTP endpoint of the telemetry gateway. Null when telemetry is disabled."
+  value       = one(module.telemetry[*].otlp_http_endpoint)
+}
+
 # The load balancer is created by the chart's Ingress, not by Terraform, and Helm
 # does not wait for an Ingress: `wait` covers Deployments, Pods and
 # LoadBalancer Services, and returns as soon as the pods are ready, which is

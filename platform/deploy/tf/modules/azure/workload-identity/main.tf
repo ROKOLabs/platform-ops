@@ -5,13 +5,15 @@
 # scopes what that identity can do. No keys anywhere; DefaultAzureCredential
 # resolves the token in-pod.
 #
-# Three identities serve three ServiceAccounts:
+# Three identities serve three ServiceAccounts, and a fourth serves the
+# telemetry gateway when telemetry is enabled:
 #   - api              → Storage Blob Data Contributor on the storage account
 #                        and Foundry User on the Foundry account
 #                        (used by roko-api and the agent Jobs)
 #   - tickets          → Azure DevOps Boards access granted by an organization
 #                        administrator (used only by roko-api)
 #   - external-secrets → Key Vault Secrets User on the vault
+#   - otel-gateway     → Monitoring Reader on the Postgres server
 
 # --- roko-api: blob read/write for artifacts + prototypes --------------------
 resource "azurerm_user_assigned_identity" "api" {
@@ -120,4 +122,39 @@ resource "azurerm_key_vault_access_policy" "external_secrets" {
   object_id    = azurerm_user_assigned_identity.external_secrets.principal_id
 
   secret_permissions = ["Get", "List"]
+}
+
+# --- otel-gateway: Azure Monitor metrics of the Postgres server -------------
+#
+# The telemetry gateway reads the database host metrics (CPU, memory, storage,
+# connections, IOPS) from Azure Monitor. Monitoring Reader is scoped to the one
+# server, so the identity can read nothing else.
+resource "azurerm_user_assigned_identity" "otel_gateway" {
+  count = var.telemetry_enabled ? 1 : 0
+
+  name                = "${var.name}-otel-gateway"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  tags                = var.tags
+}
+
+resource "azurerm_federated_identity_credential" "otel_gateway" {
+  count = var.telemetry_enabled ? 1 : 0
+
+  name                = "${var.name}-otel-gateway"
+  resource_group_name = var.resource_group_name
+  parent_id           = azurerm_user_assigned_identity.otel_gateway[0].id
+  audience            = ["api://AzureADTokenExchange"]
+  issuer              = var.oidc_issuer_url
+  subject             = "system:serviceaccount:${var.telemetry_namespace}:${var.telemetry_service_account}"
+}
+
+resource "azurerm_role_assignment" "otel_gateway_monitoring_reader" {
+  count = var.telemetry_enabled ? 1 : 0
+
+  scope                            = var.postgres_server_id
+  role_definition_name             = "Monitoring Reader"
+  principal_id                     = azurerm_user_assigned_identity.otel_gateway[0].principal_id
+  principal_type                   = "ServicePrincipal"
+  skip_service_principal_aad_check = true
 }

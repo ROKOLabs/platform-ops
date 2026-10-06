@@ -79,3 +79,26 @@ variable "tags" {
   type    = map(string)
   default = {}
 }
+
+variable "telemetry_enabled" {
+  description = "Create the identity the telemetry gateway reads Azure Monitor metrics with."
+  type        = bool
+  default     = false
+}
+
+variable "postgres_server_id" {
+  description = "Scope for the telemetry identity's Monitoring Reader grant. Required when `telemetry_enabled` is true."
+  type        = string
+  default     = null
+}
+
+variable "telemetry_namespace" {
+  description = "Namespace of the telemetry gateway ServiceAccount."
+  type        = string
+  default     = "telemetry"
+}
+
+variable "telemetry_service_account" {
+  type    = string
+  default = "otel-gateway"
+}

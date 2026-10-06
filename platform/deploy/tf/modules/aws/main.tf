@@ -691,7 +691,7 @@ locals {
 # than merged in HCL: Helm merges values documents deeply, so overriding one
 # nested key leaves its siblings alone, which an HCL `merge()` would not.
 locals {
-  platform_values = {
+  base_platform_values = {
     api = {
       image = {
         repository = "${var.image_registry}/${var.image_names.api}"
@@ -743,6 +743,15 @@ locals {
       ingressAnnotations = local.origin_annotations
     }
   }
+}
+
+# The API exports to the telemetry gateway only when there is one. With
+# telemetry disabled the `otel` key is absent rather than null, so the chart's
+# own default stays in place.
+locals {
+  platform_values = merge(local.base_platform_values, {
+    api = merge(local.base_platform_values.api, local.telemetry_api_values)
+  })
 }
 
 resource "helm_release" "platform" {

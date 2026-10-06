@@ -159,6 +159,9 @@ module "workload_identity" {
   tags                = local.tags
 
   key_vault_authorization = var.key_vault_authorization
+
+  telemetry_enabled  = local.telemetry_enabled
+  postgres_server_id = module.postgres.server_id
 }
 
 module "foundry" {
@@ -354,7 +357,7 @@ resource "helm_release" "ingress_nginx" {
 # ── The platform itself ──────────────────────────────────────────────────────
 
 locals {
-  platform_values = {
+  base_platform_values = {
     api = {
       image = {
         repository = "${var.image_registry}/${var.image_names.api}"
@@ -455,6 +458,15 @@ locals {
       tls = { secretName = kubernetes_secret_v1.origin_tls.metadata[0].name }
     }
   }
+}
+
+# The API exports to the telemetry gateway only when there is one. With
+# telemetry disabled the `otel` key is absent rather than null, so the chart's
+# own default stays in place.
+locals {
+  platform_values = merge(local.base_platform_values, {
+    api = merge(local.base_platform_values.api, local.telemetry_api_values)
+  })
 }
 
 resource "helm_release" "platform" {
