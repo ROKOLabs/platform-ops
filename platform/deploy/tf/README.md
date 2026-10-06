@@ -71,7 +71,7 @@ local, which is why it is separate.
 
 ```hcl
 module "tf_backend" {
-  source      = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws/tf-backend?ref=0.0.21"
+  source      = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws/tf-backend?ref=0.0.22"
   bucket_name = "acme-prod-tfstate"
 }
 ```
@@ -339,7 +339,7 @@ such a deployment also sets `restrict_origin_to_cloudflare = false`.
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.21"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.22"
 
   name         = "acme-prod"
   region       = "us-east-1"
@@ -367,7 +367,7 @@ module "roko" {
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.21"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.22"
 
   name         = "acme-prod"
   region       = "us-east-1"
@@ -387,7 +387,7 @@ A deployment migrating off hand-written Terraform states the names it already ha
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.21"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.22"
 
   name         = "rokolabs-dev"
   region       = "us-east-1"
@@ -419,7 +419,7 @@ The only supported override of the version constant. It changes the images, neve
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.21"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.22"
 
   name         = "rokolabs-dev"
   region       = "us-east-1"
@@ -449,7 +449,7 @@ Memory limits each node to one agent, so the node ceiling and the agent concurre
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.21"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.22"
 
   name         = "acme-prod"
   location     = "southcentralus"
@@ -481,7 +481,7 @@ module "roko" {
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.21"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.22"
 
   name         = "acme-prod"
   location     = "southcentralus"
@@ -511,7 +511,7 @@ do not remove the Foundry requirement.
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.21"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.22"
 
   name         = "acme-prod"
   location     = "southcentralus"
@@ -793,14 +793,14 @@ To roll back to an earlier release, change the `ref` to that semver and apply ag
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.21"  # rolled back
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.22"  # rolled back
   # ... rest of the configuration
 }
 
 terraform apply
 ```
 
-The module carries `platform_version = "0.0.21"` and the chart will upgrade (or downgrade) the Kubernetes release to match. Helm rolls the release back on the cluster if any workload fails to start.
+The module carries `platform_version = "0.0.22"` and the chart will upgrade (or downgrade) the Kubernetes release to match. Helm rolls the release back on the cluster if any workload fails to start.
 
 ### Working with latest locally
 
