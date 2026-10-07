@@ -4,7 +4,8 @@
 #   otel-gateway  Deployment, one replica. Receives OTLP from the platform and
 #                 from otel-node, reads cluster state (k8s_cluster) and Postgres
 #                 statistics, adds pod metadata and `roko.deployment`, and exports
-#                 everything to `endpoint`.
+#                 everything to `endpoint`. It samples traces, and derives
+#                 request metrics from every span before it does.
 #   otel-node     DaemonSet. Reads pod and node CPU and memory from the local
 #                 kubelet (kubeletstats) and forwards them to the gateway.
 #
@@ -64,8 +65,29 @@ locals {
     spike_limit_percentage = 25
   }
 
-  # Processor order matters: shed load first, then enrich, then batch.
+  # Processor order matters: shed load first, then enrich, then batch. Spans
+  # and logs also lose the attributes in `trimmed_attributes`, and traces are
+  # sampled before they are batched.
   gateway_processors = ["memory_limiter", "k8sattributes", "resource", "batch"]
+  trace_processors   = ["memory_limiter", "k8sattributes", "resource", "resource/trim", "tail_sampling", "batch"]
+  log_processors     = ["memory_limiter", "k8sattributes", "resource", "resource/trim", "batch"]
+
+  # Per-process and per-object identifiers that every span carried and no query
+  # reads. Metrics keep them.
+  trimmed_attributes = [
+    "host.arch",
+    "k8s.pod.start_time",
+    "k8s.pod.uid",
+    "k8s.replicaset.name",
+    "k8s.replicaset.uid",
+    "process.command",
+    "process.command_args",
+    "process.executable.name",
+    "process.executable.path",
+    "process.owner",
+    "process.pid",
+    "process.runtime.description",
+  ]
 
   # `alternateConfig` replaces the chart's default config (which carries Jaeger,
   # Zipkin and a debug exporter) instead of merging into it. The presets enabled
@@ -85,15 +107,21 @@ locals {
         # The master user, read from the Secret. TLS stays on: both managed
         # servers require it.
         postgresql = {
-          endpoint            = "${var.postgres.host}:${var.postgres.port}"
-          transport           = "tcp"
-          username            = "$${env:PG_USERNAME}"
-          password            = "$${env:PG_PASSWORD}"
-          databases           = [var.postgres.database]
-          collection_interval = "60s"
+          endpoint  = "${var.postgres.host}:${var.postgres.port}"
+          transport = "tcp"
+          username  = "$${env:PG_USERNAME}"
+          password  = "$${env:PG_PASSWORD}"
+          databases = [var.postgres.database]
+          # Per-table and per-index series made up most metric ingest at 60 s.
+          collection_interval = "300s"
           tls = {
             insecure             = false
             insecure_skip_verify = var.postgres.tls_insecure_skip_verify
+          }
+          # The two largest series, and no dashboard reads them.
+          metrics = {
+            "postgresql.blocks_read" = { enabled = false }
+            "postgresql.operations"  = { enabled = false }
           }
         }
 
@@ -121,6 +149,42 @@ locals {
       k8sattributes = {
         exclude = { pods = [{ name = "^${local.node_name}-" }] }
       }
+
+      "resource/trim" = {
+        attributes = [for key in local.trimmed_attributes : { key = key, action = "delete" }]
+      }
+
+      # Only server and client spans become span metrics.
+      "filter/span_metrics" = {
+        error_mode = "ignore"
+        traces     = { span = ["kind != SPAN_KIND_SERVER and kind != SPAN_KIND_CLIENT"] }
+      }
+
+      # Keeps every trace with an error or a span over 1 s, and 10% of the
+      # rest. It needs every span of a trace in this one replica: before
+      # raising replicaCount, route traces by trace ID with the loadbalancing
+      # exporter.
+      tail_sampling = {
+        decision_wait = "10s"
+        num_traces    = 20000
+        policies = [
+          { name = "errors", type = "status_code", status_code = { status_codes = ["ERROR"] } },
+          { name = "slow", type = "latency", latency = { threshold_ms = 1000 } },
+          { name = "sample", type = "probabilistic", probabilistic = { sampling_percentage = 10 } },
+        ]
+      }
+    }
+
+    # Request counts and latency from every span, before sampling, so rates
+    # stay exact. Published as traces.span.metrics.calls and
+    # traces.span.metrics.duration (ms).
+    connectors = {
+      span_metrics = {
+        aggregation_temporality         = "AGGREGATION_TEMPORALITY_DELTA"
+        metrics_flush_interval          = "60s"
+        resource_metrics_key_attributes = ["service.name", "roko.deployment"]
+        dimensions                      = [{ name = "http.response.status_code" }]
+      }
     }
 
     exporters = { (local.exporter_name) = local.exporter }
@@ -134,14 +198,24 @@ locals {
           processors = local.gateway_processors
           exporters  = [local.exporter_name]
         }
+        "metrics/span_metrics" = {
+          receivers  = ["span_metrics"]
+          processors = ["memory_limiter", "batch"]
+          exporters  = [local.exporter_name]
+        }
         traces = {
           receivers  = ["otlp"]
-          processors = local.gateway_processors
+          processors = local.trace_processors
           exporters  = [local.exporter_name]
+        }
+        "traces/span_metrics" = {
+          receivers  = ["otlp"]
+          processors = ["memory_limiter", "resource", "filter/span_metrics"]
+          exporters  = ["span_metrics"]
         }
         logs = {
           receivers  = ["otlp"]
-          processors = local.gateway_processors
+          processors = local.log_processors
           exporters  = [local.exporter_name]
         }
       }

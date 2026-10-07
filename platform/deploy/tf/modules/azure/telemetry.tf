@@ -10,8 +10,8 @@ locals {
   telemetry_enabled         = var.telemetry.enabled
   telemetry_deployment_name = coalesce(var.telemetry.deployment_name, local.resource_prefix)
 
-  # Merged into the API's chart values in main.tf.
-  telemetry_api_values = {
+  # Merged into the API's and the web app's chart values in main.tf.
+  telemetry_chart_values = {
     for k, v in { otel = { endpoint = one(module.telemetry[*].otlp_http_endpoint) } } : k => v
     if local.telemetry_enabled
   }

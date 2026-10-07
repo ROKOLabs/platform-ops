@@ -155,6 +155,11 @@ run "disabled_creates_no_telemetry" {
   }
 
   assert {
+    condition     = !contains(keys(local.platform_values.web), "otel")
+    error_message = "telemetry.enabled = false must not set web.otel."
+  }
+
+  assert {
     condition     = output.telemetry_otlp_endpoint == null && output.telemetry_headers_secret == null
     error_message = "The telemetry outputs must be null when telemetry is disabled."
   }
@@ -213,6 +218,31 @@ run "defaults" {
   assert {
     condition     = local.platform_values.api.otel.endpoint == "http://otel-gateway.telemetry.svc.cluster.local:4318"
     error_message = "api.otel.endpoint must point at the gateway when telemetry is enabled."
+  }
+
+  assert {
+    condition     = local.platform_values.web.otel.endpoint == "http://otel-gateway.telemetry.svc.cluster.local:4318"
+    error_message = "web.otel.endpoint must point at the gateway when telemetry is enabled."
+  }
+
+  assert {
+    condition     = module.telemetry[0].gateway_config.service.pipelines.traces.processors == ["memory_limiter", "k8sattributes", "resource", "resource/trim", "tail_sampling", "batch"]
+    error_message = "Traces must be trimmed and tail-sampled before they are batched."
+  }
+
+  assert {
+    condition     = [for p in module.telemetry[0].gateway_config.processors.tail_sampling.policies : p.name] == ["errors", "slow", "sample"]
+    error_message = "Tail sampling must keep errors and slow traces, and sample the rest."
+  }
+
+  assert {
+    condition     = module.telemetry[0].gateway_config.service.pipelines["traces/span_metrics"].exporters == ["span_metrics"] && module.telemetry[0].gateway_config.service.pipelines["metrics/span_metrics"].receivers == ["span_metrics"]
+    error_message = "Span metrics must be derived from unsampled traces and exported as metrics."
+  }
+
+  assert {
+    condition     = module.telemetry[0].gateway_config.receivers.postgresql.collection_interval == "300s" && !module.telemetry[0].gateway_config.receivers.postgresql.metrics["postgresql.blocks_read"].enabled
+    error_message = "Postgres statistics must be read every 5 minutes without blocks_read."
   }
 }
 
