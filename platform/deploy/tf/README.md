@@ -236,10 +236,17 @@ flowchart LR
 
 | Signal | Source | Interval |
 | --- | --- | --- |
-| API traces, metrics and logs | The API exports OTLP to `otel-gateway`. The module sets `api.otel.endpoint` for it. | As the API sends |
+| API and web traces, metrics and logs | The API, the web app and agent pods export OTLP to `otel-gateway`. The module sets `api.otel.endpoint` and `web.otel.endpoint`; agent pods inherit the API's. | As they send |
+| Request counts and latency | The gateway's `span_metrics` connector derives `traces.span.metrics.calls` and `traces.span.metrics.duration` from every server and client span, before sampling. | 60 s |
 | Pod and node CPU and memory | `otel-node` DaemonSet, `kubeletstats` against its own node's kubelet. It tolerates every taint. | 60 s |
 | Kubernetes cluster state | `k8s_cluster` receiver on the gateway. | 60 s |
-| Postgres statistics | `postgresql` receiver, over TLS, as the master user. | 60 s |
+| Postgres statistics | `postgresql` receiver, over TLS, as the master user. `blocks_read` and `operations` are off. | 300 s |
+
+The gateway samples traces before it exports them. It keeps every trace with an
+error or a span over 1 s, and 10% of the rest. Spans and logs lose
+per-process and per-object resource attributes that no query reads, such as
+`process.command_args` and `k8s.pod.uid`. Sampling needs every span of a trace
+in one gateway replica, so the gateway runs one replica.
 | Database host metrics, AWS | A YACE sidecar reads `AWS/RDS` from CloudWatch: CPU, freeable memory, free storage, connections, read and write latency, read and write IOPS. | 300 s |
 | Database host metrics, Azure | `azuremonitor` receiver reads the Flexible Server: CPU, memory and storage percent, active connections, read and write IOPS. | 300 s |
 

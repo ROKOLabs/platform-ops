@@ -470,12 +470,13 @@ locals {
   }
 }
 
-# The API exports to the telemetry gateway only when there is one. With
-# telemetry disabled the `otel` key is absent rather than null, so the chart's
-# own default stays in place.
+# The API and the web app export to the telemetry gateway only when there is
+# one. With telemetry disabled the `otel` key is absent rather than null, so
+# each chart's own default stays in place.
 locals {
   platform_values = merge(local.base_platform_values, {
-    api = merge(local.base_platform_values.api, local.telemetry_api_values)
+    api = merge(local.base_platform_values.api, local.telemetry_chart_values)
+    web = merge(local.base_platform_values.web, local.telemetry_chart_values)
   })
 }
 
