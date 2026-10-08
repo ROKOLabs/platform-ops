@@ -54,7 +54,7 @@ resource "azurerm_role_assignment" "api_foundry_user" {
 
 # Commented out: the Terraform principal lacks Microsoft.Authorization/roleAssignments/write
 # (needs Owner or Contributor + User Access Administrator). Granted manually via
-# `az role assignment create` instead — see deploy/plcp/tf/README.md.
+# `az role assignment create` instead.
 # resource "azurerm_role_assignment" "api_blob" {
 #   scope                = var.storage_account_id
 #   role_definition_name = "Storage Blob Data Contributor"
@@ -102,7 +102,7 @@ resource "azurerm_federated_identity_credential" "external_secrets" {
 
 # Commented out: the Terraform principal lacks Microsoft.Authorization/roleAssignments/write
 # (needs Owner or Contributor + User Access Administrator). Granted manually via
-# `az role assignment create` instead — see deploy/plcp/tf/README.md.
+# `az role assignment create` instead.
 # resource "azurerm_role_assignment" "external_secrets_kv" {
 #   scope                = var.key_vault_id
 #   role_definition_name = "Key Vault Secrets User"
