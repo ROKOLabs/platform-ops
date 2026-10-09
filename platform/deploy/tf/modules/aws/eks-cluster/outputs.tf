@@ -22,3 +22,7 @@ output "cluster_security_group_id" {
   value       = module.eks.cluster_security_group_id
 }
 output "oidc_provider_arn" { value = module.eks.oidc_provider_arn }
+output "node_pools" {
+  description = "The built-in Auto Mode NodePools the cluster enables. The agents NodePool needs at least one, for the default NodeClass."
+  value       = var.node_pools
+}

@@ -51,6 +51,17 @@ variable "high_availability" {
 
 # ── Cluster access ───────────────────────────────────────────────────────────
 
+variable "node_pools" {
+  description = "The built-in EKS Auto Mode NodePools to enable: `general-purpose`, `system`, or both. At least one must stay on: EKS provisions the `default` NodeClass the agents NodePool references only while one is enabled, and the plan fails otherwise."
+  type        = list(string)
+  default     = ["general-purpose", "system"]
+
+  validation {
+    condition     = alltrue([for pool in var.node_pools : contains(["general-purpose", "system"], pool)])
+    error_message = "node_pools accepts only \"general-purpose\" and \"system\"."
+  }
+}
+
 variable "kubernetes_version" {
   description = "EKS Kubernetes version. 1.36 leaves standard support in August 2027; a version already near its end date puts a deployment into an upgrade or into extended-support pricing shortly after it is created."
   type        = string
@@ -236,6 +247,23 @@ variable "agent_checkpoint_expiration_days" {
   description = "Backstop expiry for checkpoint objects the backend's own cleanup and daily sweep did not remove."
   type        = number
   default     = 30
+}
+
+variable "agent_node_idle_timeout" {
+  description = "How long an empty node on the agents NodePool stays up before Karpenter removes it, as a Karpenter duration (`consolidateAfter`). The warm pool's placeholders keep a node from being empty while a run started in the last hour, so this covers only the tail after they go."
+  type        = string
+  default     = "30s"
+
+  validation {
+    condition     = can(regex("^[0-9]+(ns|us|µs|ms|s|m|h)$", var.agent_node_idle_timeout))
+    error_message = "agent_node_idle_timeout must be a Karpenter duration such as \"30s\" or \"1h\"."
+  }
+}
+
+variable "keda_chart_version" {
+  description = "kedacore/keda chart version installed into the cluster. KEDA scales the warm pool's placeholder Deployment from the API."
+  type        = string
+  default     = "2.20.2"
 }
 
 # ── Budget ───────────────────────────────────────────────────────────────────
