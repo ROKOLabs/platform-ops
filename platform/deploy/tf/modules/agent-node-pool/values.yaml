@@ -1,0 +1,32 @@
+# The dedicated Karpenter NodePool agent Jobs run on (Roko CR-379).
+#
+# Agent pods carry roko.dev/agent-pool=<name> as a nodeSelector and a
+# toleration (the platform chart's api.agents.nodePool value), so only they
+# and the warm pool's placeholder pods land here, and nothing else can. The
+# cloud module sets nodeClassRef; everything else has a default.
+
+# The pool's name, and the value of the roko.dev/agent-pool label and taint.
+name: agents
+
+# How long an empty node stays up before Karpenter removes it. A placeholder
+# pod is not a DaemonSet pod, so a node that holds one is not empty; the
+# platform's pre-pull DaemonSet alone never keeps a node alive.
+idleTimeout: 30s
+
+# Karpenter counts node capacity against this, not pod requests: an 8 CPU
+# agent lands on a 16 vCPU node. With three agent slots, 64 leaves one node
+# of slack.
+cpuLimit: 64
+
+# The NodeClass the pool provisions from. EKS Auto Mode's default NodeClass
+# on AWS; the AKSNodeClass node auto-provisioning creates on Azure.
+nodeClassRef:
+  group: eks.amazonaws.com
+  kind: NodeClass
+  name: default
+
+architectures: [amd64]
+
+# On-demand only: a spot interruption kills a running agent and loses up to
+# 90 s of work since its last checkpoint.
+capacityTypes: [on-demand]

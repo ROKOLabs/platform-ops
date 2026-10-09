@@ -75,6 +75,15 @@ resource "azurerm_kubernetes_cluster" "this" {
     }
   }
 
+  # The managed KEDA add-on scales the platform's warm agent pool (Roko
+  # CR-379). NAP only: the fixed `agents` pool keeps a node up itself.
+  dynamic "workload_autoscaler_profile" {
+    for_each = local.nap ? [1] : []
+    content {
+      keda_enabled = true
+    }
+  }
+
   network_profile {
     network_plugin    = "azure"
     network_policy    = "azure"

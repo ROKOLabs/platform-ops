@@ -301,6 +301,42 @@ identity, the headers secret, and the API's OTLP endpoint.
 telemetry = { enabled = false }
 ```
 
+## Agent nodes
+
+Agent Jobs run on a dedicated Karpenter NodePool named `agents`, and spare
+nodes on it stay warm between runs (Roko CR-379). Both modules create the pool
+from the local `modules/agent-node-pool` chart; the platform chart's
+`api.agents.nodePool` selects it, so nothing else lands there.
+
+```mermaid
+sequenceDiagram
+    participant K as KEDA
+    participant API as roko-api
+    participant P as placeholder pods
+    participant KP as Karpenter
+    K->>API: GET /internal/agent-pool, every 15 s
+    API-->>K: desired = largest burst of run starts in the last hour
+    K->>P: replicas = desired
+    P->>KP: a Pending placeholder asks for a node
+    Note over P,KP: An agent Job preempts a placeholder and starts on its node
+```
+
+| Part | AWS | Azure with NAP | Azure before the subnet grant |
+| --- | --- | --- | --- |
+| `agents` NodePool | Local chart, EKS `default` NodeClass | Local chart, `AKSNodeClass` named by `agent_node_class_name` | The fixed AKS `agents` pool, one node at least |
+| KEDA | `kedacore/keda` release at `keda_chart_version`, in the `keda` namespace | The AKS-managed add-on | None |
+| `api.agents.warmPool.enabled` | `true` | `true` | `false` |
+
+- The pool keeps an empty node for `agent_node_idle_timeout` and caps its
+  capacity at `agent_node_pool_cpu_limit` CPU. Both are variables on each
+  module.
+- On AWS the pool references the `default` NodeClass, which EKS Auto Mode
+  provisions only while a built-in NodePool is enabled. The plan fails when
+  `node_pools` is empty.
+- The AKS add-on version is confirmed on the first NAP apply: the warm pool's
+  fallback needs KEDA 2.17 or later. An older add-on means a `helm_release`
+  of `kedacore/keda` in its place.
+
 ## Day two
 
 **Upgrade to a new release.** Change the `?ref=` in your `source` and apply. One
@@ -455,10 +491,10 @@ module "roko" {
 The fixed AKS system pool has two `Standard_D4s_v5` nodes and the
 `CriticalAddonsOnly=true:NoSchedule` taint. AKS node auto-provisioning (NAP)
 creates application nodes for `roko-api`, `roko-web`, and agent Jobs from its
-default node pool. The Azure chart leaves `agents.nodePool` empty so agent Jobs
-can use those nodes. The chart defaults to three concurrent Jobs, each requesting
-one CPU, 8Gi of memory, and 8Gi of ephemeral storage.
-Remove any `chart_values.api.agents.nodePool` override that still names `agents`.
+default node pool. Agent Jobs take the `agents` Karpenter NodePool the module
+creates under NAP, kept warm as [Agent nodes](#agent-nodes) describes. The
+chart defaults to three concurrent Jobs, each requesting one CPU, 8Gi of
+memory, and 8Gi of ephemeral storage.
 
 The cluster uses a separate user-assigned control-plane identity. Terraform
 grants it Network Contributor on the AKS subnet before creating or updating the
@@ -650,6 +686,7 @@ module "roko" {
 | `public_subnet_cidrs` | list(string) | `[]` | Public subnet CIDRs, same rule. |
 | `high_availability` | bool | `false` | On runs a NAT gateway per zone and a standby database in a second zone. Off shares one NAT gateway and runs a single database. It decides what is duplicated across the zones in `azs`; it does not change how many zones there are. |
 | `kubernetes_version` | string | `1.36` | EKS version. Standard support runs to August 2027. |
+| `node_pools` | list(string) | `["general-purpose", "system"]` | The built-in Auto Mode NodePools to enable. At least one must stay on: the agents NodePool needs the `default` NodeClass that exists only while one is enabled. |
 | `admin_principal_arns` | list(string) | `[]` | Principals granted cluster admin, on top of whoever applies. Roles and users both work. Use the FULL pathful ARN: EKS rejects path-stripped SSO role ARNs. |
 | `viewer_principal_arns` | list(string) | `[]` | Principals granted cluster-wide read access. Same pathful-ARN rule. |
 | `grant_terraform_principal_admin` | bool | `true` | Grants cluster admin to the identity applying the module, resolved through its session context so an SSO role keeps its path. Turn it off only where two identities apply the same state, and list both instead. |
@@ -683,6 +720,7 @@ module "roko" {
 | `image_tag` | string | `""` | Empty means the module's own version. Set only by a lane that builds its own images. |
 | `chart_values` | any | `{}` | Merged over the computed chart values. Passed to Helm as a second values document, so the merge is deep. |
 | `external_secrets_chart_version` | string | `2.8.0` | external-secrets chart version. |
+| `keda_chart_version` | string | `2.20.2` | kedacore/keda chart version. KEDA scales the warm agent pool. |
 
 ### Names
 
@@ -702,6 +740,8 @@ Every name defaults to one derived from `name`, which is what a new deployment w
 | `agent_bedrock_model_arns` | list(string) | any model in the account | Bedrock model and inference-profile ARNs the agent and API roles may invoke. |
 | `agent_checkpoint_prefix` | string | `runs` | Key prefix run checkpoints are written under. Both IAM grants are scoped to it. |
 | `agent_checkpoint_expiration_days` | number | `30` | Backstop expiry for checkpoint objects the backend's own cleanup missed. |
+| `agent_node_idle_timeout` | string | `30s` | How long an empty node on the agents NodePool stays up, as a Karpenter duration. |
+| `agent_node_pool_cpu_limit` | number | `64` | `limits.cpu` on the agents NodePool, counted against node capacity. |
 
 ### Budget and tagging
 
@@ -815,6 +855,9 @@ The same shape with Azure's own names. Four names are required rather than deriv
 
 | Input | Type | Default | Purpose |
 | --- | --- | --- | --- |
+| `agent_node_idle_timeout` | string | `30s` | How long an empty node on the agents NodePool stays up, as a Karpenter duration. NAP shape only. |
+| `agent_node_pool_cpu_limit` | number | `64` | `limits.cpu` on the agents NodePool, counted against node capacity. NAP shape only. |
+| `agent_node_class_name` | string | `default` | The `AKSNodeClass` the agents NodePool provisions from. NAP shape only. |
 | `roles_granted_by_client` | set(string) | `null` | `null`: Terraform creates the AKS subnet role assignment. A set: the client creates it by hand, and each entry names a `required_role_assignments` row that is in place; the only key is `aks-subnet`. Without it the cluster keeps the pre-NAP shape. See "Clients that grant roles themselves". |
 | `key_vault_authorization` | string | `rbac` | `rbac` grants through role assignments. `access_policy` grants through vault access policies, which Contributor alone can write. Switching an existing vault needs `roleAssignments/write` in either direction, so choose before the first apply. |
 | `key_vault_soft_delete_retention_days` | number | `7` | How long a deleted vault, and a deleted secret in it, can be recovered. 7 to 90. |

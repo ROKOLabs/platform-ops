@@ -1,0 +1,30 @@
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: {{ .Values.name }}
+spec:
+  template:
+    metadata:
+      labels:
+        roko.dev/agent-pool: {{ .Values.name | quote }}
+    spec:
+      nodeClassRef:
+        group: {{ .Values.nodeClassRef.group }}
+        kind: {{ .Values.nodeClassRef.kind }}
+        name: {{ .Values.nodeClassRef.name }}
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: {{ toJson .Values.architectures }}
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: {{ toJson .Values.capacityTypes }}
+      taints:
+        - key: roko.dev/agent-pool
+          value: {{ .Values.name | quote }}
+          effect: NoSchedule
+  disruption:
+    consolidationPolicy: WhenEmpty
+    consolidateAfter: {{ .Values.idleTimeout }}
+  limits:
+    cpu: {{ .Values.cpuLimit | quote }}

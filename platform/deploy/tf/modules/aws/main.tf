@@ -64,6 +64,8 @@ module "cluster" {
   admin_principal_arns  = local.admin_principal_arns
   viewer_principal_arns = var.viewer_principal_arns
 
+  node_pools = var.node_pools
+
   tags = local.tags
 }
 
@@ -710,10 +712,14 @@ locals {
 
       secretEncryption = { secretName = aws_secretsmanager_secret.secret_encryption.name }
 
-      agents = {
-        image            = "${var.image_registry}/${var.image_names.agent}:${local.image_tag}"
-        checkpointBucket = aws_s3_bucket.checkpoints.bucket
-      }
+      agents = merge(
+        {
+          image            = "${var.image_registry}/${var.image_names.agent}:${local.image_tag}"
+          checkpointBucket = aws_s3_bucket.checkpoints.bucket
+        },
+        # The dedicated agent NodePool and the warm pool (agent-warm-pool.tf).
+        local.agent_warm_pool_chart_values,
+      )
     }
 
     web = {
@@ -783,8 +789,13 @@ resource "helm_release" "platform" {
 
   # The chart templates a SecretStore and two ExternalSecrets, so the operator's
   # CRDs have to be registered before Helm applies them. That edge is not
-  # expressible through a value, so it is written here.
-  depends_on = [module.external_secrets]
+  # expressible through a value, so it is written here. The same for KEDA's
+  # ScaledObject, and for the agents NodePool the agent Jobs select.
+  depends_on = [
+    module.external_secrets,
+    helm_release.keda,
+    helm_release.agent_node_pool,
+  ]
 }
 
 # ── Budget ───────────────────────────────────────────────────────────────────

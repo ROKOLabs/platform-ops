@@ -431,10 +431,13 @@ locals {
           # Contributor role is scoped to this storage account.
           workloadIdentity = { clientId = module.workload_identity.api_client_id }
         },
-        # Before the subnet grant, Jobs pin to the fixed `agents` pool with the
-        # pre-NAP sizing: one three-CPU, 8Gi agent per D4s_v5 node.
+        # The `agents` pool in both shapes: the Karpenter NodePool with the
+        # warm pool under NAP, the fixed AKS pool before the subnet grant. Both
+        # carry the same label and taint (agent-warm-pool.tf).
+        local.agent_warm_pool_chart_values,
+        # Before the subnet grant, Jobs take the fixed pool's pre-NAP sizing:
+        # one three-CPU, 8Gi agent per D4s_v5 node.
         local.nap ? {} : {
-          nodePool         = "agents"
           maxConcurrency   = 3
           cpu              = "3"
           memory           = "8Gi"
@@ -506,9 +509,11 @@ resource "helm_release" "platform" {
   cleanup_on_fail = true
 
   # The chart templates a SecretStore and two ExternalSecrets, so the operator's
-  # CRDs have to be registered before Helm applies them.
+  # CRDs have to be registered before Helm applies them. The agents NodePool
+  # comes first for the same reason: agent Jobs select it.
   depends_on = [
     module.cluster_config,
     helm_release.ingress_nginx,
+    helm_release.agent_node_pool,
   ]
 }
