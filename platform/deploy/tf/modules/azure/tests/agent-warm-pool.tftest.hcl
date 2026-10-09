@@ -136,8 +136,8 @@ run "nap" {
   }
 
   assert {
-    condition     = yamldecode(helm_release.agent_node_pool[0].values[0]) == { name = "agents", idleTimeout = "30s", cpuLimit = 64, nodeClassRef = { group = "karpenter.azure.com", kind = "AKSNodeClass", name = "default" } }
-    error_message = "The agents NodePool must consolidate after 30s, cap at 64 CPU and reference the AKSNodeClass default."
+    condition     = yamldecode(helm_release.agent_node_pool[0].values[0]) == { name = "agents", idleTimeout = "30s", nodeClassRef = { group = "karpenter.azure.com", kind = "AKSNodeClass", name = "default" } }
+    error_message = "The agents NodePool must consolidate after 30s, set no limits and reference the AKSNodeClass default."
   }
 
   assert {

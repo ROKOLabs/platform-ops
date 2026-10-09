@@ -260,12 +260,6 @@ variable "agent_node_idle_timeout" {
   }
 }
 
-variable "agent_node_pool_cpu_limit" {
-  description = "`limits.cpu` on the agents NodePool. Karpenter counts node capacity against it, not pod requests: an 8 CPU agent lands on a 16 vCPU node. With three agent slots, 64 leaves one node of slack."
-  type        = number
-  default     = 64
-}
-
 variable "keda_chart_version" {
   description = "kedacore/keda chart version installed into the cluster. KEDA scales the warm pool's placeholder Deployment from the API."
   type        = string

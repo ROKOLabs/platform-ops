@@ -301,12 +301,6 @@ variable "agent_node_idle_timeout" {
   }
 }
 
-variable "agent_node_pool_cpu_limit" {
-  description = "`limits.cpu` on the agents NodePool. Node capacity, not pod requests. NAP shape only."
-  type        = number
-  default     = 64
-}
-
 variable "agent_node_class_name" {
   description = "The AKSNodeClass the agents NodePool provisions from. Node auto-provisioning creates `default`. NAP shape only."
   type        = string
