@@ -17,7 +17,6 @@ locals {
   agent_node_pool_values = {
     name        = local.agent_node_pool_name
     idleTimeout = var.agent_node_idle_timeout
-    cpuLimit    = var.agent_node_pool_cpu_limit
     nodeClassRef = {
       group = "karpenter.azure.com"
       kind  = "AKSNodeClass"

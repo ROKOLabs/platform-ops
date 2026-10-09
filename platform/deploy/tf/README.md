@@ -327,9 +327,11 @@ sequenceDiagram
 | KEDA | `kedacore/keda` release at `keda_chart_version`, in the `keda` namespace | The AKS-managed add-on | None |
 | `api.agents.warmPool.enabled` | `true` | `true` | `false` |
 
-- The pool keeps an empty node for `agent_node_idle_timeout` and caps its
-  capacity at `agent_node_pool_cpu_limit` CPU. Both are variables on each
-  module.
+- The pool keeps an empty node for `agent_node_idle_timeout`, a variable on
+  each module. It sets no Karpenter limit: `api.agents.maxConcurrency` in the
+  chart values bounds launched agents plus spares, and each agent lands on a
+  16 vCPU node, so that value times 16 is the on-demand vCPU capacity the
+  account's EC2 or Azure quota has to cover.
 - On AWS the pool references the `default` NodeClass, which EKS Auto Mode
   provisions only while a built-in NodePool is enabled. The plan fails when
   `node_pools` is empty.
@@ -741,7 +743,6 @@ Every name defaults to one derived from `name`, which is what a new deployment w
 | `agent_checkpoint_prefix` | string | `runs` | Key prefix run checkpoints are written under. Both IAM grants are scoped to it. |
 | `agent_checkpoint_expiration_days` | number | `30` | Backstop expiry for checkpoint objects the backend's own cleanup missed. |
 | `agent_node_idle_timeout` | string | `30s` | How long an empty node on the agents NodePool stays up, as a Karpenter duration. |
-| `agent_node_pool_cpu_limit` | number | `64` | `limits.cpu` on the agents NodePool, counted against node capacity. |
 
 ### Budget and tagging
 
@@ -856,7 +857,6 @@ The same shape with Azure's own names. Four names are required rather than deriv
 | Input | Type | Default | Purpose |
 | --- | --- | --- | --- |
 | `agent_node_idle_timeout` | string | `30s` | How long an empty node on the agents NodePool stays up, as a Karpenter duration. NAP shape only. |
-| `agent_node_pool_cpu_limit` | number | `64` | `limits.cpu` on the agents NodePool, counted against node capacity. NAP shape only. |
 | `agent_node_class_name` | string | `default` | The `AKSNodeClass` the agents NodePool provisions from. NAP shape only. |
 | `roles_granted_by_client` | set(string) | `null` | `null`: Terraform creates the AKS subnet role assignment. A set: the client creates it by hand, and each entry names a `required_role_assignments` row that is in place; the only key is `aks-subnet`. Without it the cluster keeps the pre-NAP shape. See "Clients that grant roles themselves". |
 | `key_vault_authorization` | string | `rbac` | `rbac` grants through role assignments. `access_policy` grants through vault access policies, which Contributor alone can write. Switching an existing vault needs `roleAssignments/write` in either direction, so choose before the first apply. |

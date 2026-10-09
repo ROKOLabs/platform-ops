@@ -55,8 +55,8 @@ run "defaults" {
   command = plan
 
   assert {
-    condition     = yamldecode(helm_release.agent_node_pool.values[0]) == { name = "agents", idleTimeout = "30s", cpuLimit = 64, nodeClassRef = { group = "eks.amazonaws.com", kind = "NodeClass", name = "default" } }
-    error_message = "The agents NodePool must consolidate after 30s, cap at 64 CPU and reference the EKS default NodeClass."
+    condition     = yamldecode(helm_release.agent_node_pool.values[0]) == { name = "agents", idleTimeout = "30s", nodeClassRef = { group = "eks.amazonaws.com", kind = "NodeClass", name = "default" } }
+    error_message = "The agents NodePool must consolidate after 30s, set no limits and reference the EKS default NodeClass."
   }
 
   assert {
@@ -84,14 +84,13 @@ run "tunables" {
   command = plan
 
   variables {
-    agent_node_idle_timeout   = "5m"
-    agent_node_pool_cpu_limit = 32
-    keda_chart_version        = "2.21.0"
+    agent_node_idle_timeout = "5m"
+    keda_chart_version      = "2.21.0"
   }
 
   assert {
-    condition     = yamldecode(helm_release.agent_node_pool.values[0]).idleTimeout == "5m" && yamldecode(helm_release.agent_node_pool.values[0]).cpuLimit == 32
-    error_message = "The idle timeout and the CPU limit must come from the variables."
+    condition     = yamldecode(helm_release.agent_node_pool.values[0]).idleTimeout == "5m"
+    error_message = "The idle timeout must come from the variable."
   }
 
   assert {

@@ -26,5 +26,3 @@ spec:
   disruption:
     consolidationPolicy: WhenEmpty
     consolidateAfter: {{ .Values.idleTimeout }}
-  limits:
-    cpu: {{ .Values.cpuLimit | quote }}
