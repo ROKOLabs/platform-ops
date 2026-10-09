@@ -290,6 +290,29 @@ variable "extra_secrets_officer_object_ids" {
   default     = []
 }
 
+variable "agent_node_idle_timeout" {
+  description = "How long an empty node on the agents NodePool stays up before node auto-provisioning removes it, as a Karpenter duration (`consolidateAfter`). NAP shape only."
+  type        = string
+  default     = "30s"
+
+  validation {
+    condition     = can(regex("^[0-9]+(ns|us|µs|ms|s|m|h)$", var.agent_node_idle_timeout))
+    error_message = "agent_node_idle_timeout must be a Karpenter duration such as \"30s\" or \"1h\"."
+  }
+}
+
+variable "agent_node_pool_cpu_limit" {
+  description = "`limits.cpu` on the agents NodePool. Node capacity, not pod requests. NAP shape only."
+  type        = number
+  default     = 64
+}
+
+variable "agent_node_class_name" {
+  description = "The AKSNodeClass the agents NodePool provisions from. Node auto-provisioning creates `default`. NAP shape only."
+  type        = string
+  default     = "default"
+}
+
 variable "external_secrets_chart_version" {
   description = "external-secrets chart version installed into the cluster."
   type        = string
