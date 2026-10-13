@@ -71,7 +71,7 @@ local, which is why it is separate.
 
 ```hcl
 module "tf_backend" {
-  source      = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws/tf-backend?ref=0.0.22"
+  source      = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws/tf-backend?ref=0.0.23"
   bucket_name = "acme-prod-tfstate"
 }
 ```
@@ -346,7 +346,7 @@ such a deployment also sets `restrict_origin_to_cloudflare = false`.
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.22"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.23"
 
   name         = "acme-prod"
   region       = "us-east-1"
@@ -374,7 +374,7 @@ module "roko" {
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.22"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.23"
 
   name         = "acme-prod"
   region       = "us-east-1"
@@ -394,7 +394,7 @@ A deployment migrating off hand-written Terraform states the names it already ha
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.22"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.23"
 
   name         = "rokolabs-dev"
   region       = "us-east-1"
@@ -426,7 +426,7 @@ The only supported override of the version constant. It changes the images, neve
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.22"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.23"
 
   name         = "rokolabs-dev"
   region       = "us-east-1"
@@ -483,7 +483,7 @@ that fail the backend's three-minute pod health check need a retry.
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.22"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.23"
 
   name         = "acme-prod"
   location     = "southcentralus"
@@ -576,7 +576,7 @@ Two rules keep this safe:
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.22"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.23"
 
   name         = "acme-prod"
   location     = "southcentralus"
@@ -609,7 +609,7 @@ the subnet, `roles_granted_by_client` moves the grant to the client; see
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.22"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.23"
 
   name         = "acme-prod"
   location     = "southcentralus"
@@ -870,7 +870,7 @@ The `latest` tag advances when a new platform release is published. Deployments 
 The module's `platform_version` output always states the semver that `latest` resolved to:
 
 ```bash
-terraform output platform_version  # prints the semver, e.g. 0.0.22
+terraform output platform_version  # prints the semver, e.g. 0.0.23
 curl https://<deployment>/api/version  # the deployment reports the same version
 ```
 
@@ -880,7 +880,7 @@ To hold a deployment steady at one release, pin to the semver tag:
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.22"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.23"
   # ... rest of the configuration
 }
 ```
@@ -891,14 +891,14 @@ To roll back to an earlier release, change the `ref` to that semver and apply ag
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.22"  # rolled back
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.23"  # rolled back
   # ... rest of the configuration
 }
 
 terraform apply
 ```
 
-The module carries `platform_version = "0.0.22"` and the chart will upgrade (or downgrade) the Kubernetes release to match. Helm rolls the release back on the cluster if any workload fails to start.
+The module carries `platform_version = "0.0.23"` and the chart will upgrade (or downgrade) the Kubernetes release to match. Helm rolls the release back on the cluster if any workload fails to start.
 
 ### Working with latest locally
 
