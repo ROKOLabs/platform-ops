@@ -238,9 +238,9 @@ variable "agent_bedrock_model_arns" {
 }
 
 variable "agent_checkpoint_prefix" {
-  description = "Key prefix the agent supervisor writes run checkpoints under. Both IAM grants are scoped to it."
+  description = "Key prefix the session host writes checkpoints under. roko-api sets CHECKPOINT_PREFIX=sessions on every session pod. Both IAM grants are scoped to it."
   type        = string
-  default     = "runs"
+  default     = "sessions"
 }
 
 variable "agent_checkpoint_expiration_days" {
