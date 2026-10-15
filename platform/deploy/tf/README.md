@@ -327,6 +327,14 @@ sequenceDiagram
 | KEDA | `kedacore/keda` release at `keda_chart_version`, in the `keda` namespace | The AKS-managed add-on | None |
 | `api.agents.warmPool.enabled` | `true` | `true` | `false` |
 
+- The chart side of the warm pool (the placeholders, the ScaledObject and the
+  pre-pull DaemonSet) is in platform 0.0.24 and later. `platform_version` in
+  each module's `version.tf` pins the chart, so a deployment at `?ref=0.0.24`
+  or later gets both halves. An older chart ignores `api.agents.warmPool`:
+  the pool and KEDA exist, agent Jobs land on the pool, and no placeholder
+  renders.
+- Each placeholder repels the others across nodes, so a spare is always one
+  node sized for one agent, and leaves when its placeholder goes.
 - The pool keeps an empty node for `agent_node_idle_timeout`, a variable on
   each module. It sets no Karpenter limit: `api.agents.maxConcurrency` in the
   chart values bounds launched agents plus spares, and each agent lands on a
