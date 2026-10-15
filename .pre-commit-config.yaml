@@ -5,6 +5,9 @@ repos:
     rev: v0.19.0
     hooks:
       - id: yamlfmt
+        # Helm templates carry Go template syntax that is not YAML until Helm
+        # renders it. Helm checks them itself.
+        exclude: ^platform/deploy/tf/modules/[^/]+/templates/
 
   - repo: https://github.com/scop/pre-commit-shfmt
     rev: v3.13.1-1

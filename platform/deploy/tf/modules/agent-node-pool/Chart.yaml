@@ -1,0 +1,5 @@
+apiVersion: v2
+name: agent-node-pool
+description: The dedicated Karpenter NodePool Roko agent Jobs run on (Roko CR-379).
+type: application
+version: 0.1.0
