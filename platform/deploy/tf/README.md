@@ -748,7 +748,7 @@ Every name defaults to one derived from `name`, which is what a new deployment w
 | --- | --- | --- | --- |
 | `artifact_cors_origins` | list(string) | `[]` | Browser origins allowed to PUT/GET the uploads bucket through presigned URLs. Empty means `https://<ingress_host>` alone. |
 | `agent_bedrock_model_arns` | list(string) | any model in the account | Bedrock model and inference-profile ARNs the agent and API roles may invoke. |
-| `agent_checkpoint_prefix` | string | `runs` | Key prefix run checkpoints are written under. Both IAM grants are scoped to it. |
+| `agent_checkpoint_prefix` | string | `sessions` | Key prefix session checkpoints are written under. Must match roko-api's `CHECKPOINT_PREFIX` (`sessions`). Both IAM grants are scoped to it. |
 | `agent_checkpoint_expiration_days` | number | `30` | Backstop expiry for checkpoint objects the backend's own cleanup missed. |
 | `agent_node_idle_timeout` | string | `30s` | How long an empty node on the agents NodePool stays up, as a Karpenter duration. |
 
