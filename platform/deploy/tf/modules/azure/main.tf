@@ -444,6 +444,9 @@ locals {
           ephemeralStorage = "8Gi"
         }
       )
+
+      # Render Jobs for Status Report PDFs and prototype thumbnails (renders.tf).
+      renders = local.render_chart_values
     }
 
     web = {
@@ -509,11 +512,12 @@ resource "helm_release" "platform" {
   cleanup_on_fail = true
 
   # The chart templates a SecretStore and two ExternalSecrets, so the operator's
-  # CRDs have to be registered before Helm applies them. The agents NodePool
-  # comes first for the same reason: agent Jobs select it.
+  # CRDs have to be registered before Helm applies them. The agents and
+  # renders NodePools come first for the same reason: the Jobs select them.
   depends_on = [
     module.cluster_config,
     helm_release.ingress_nginx,
     helm_release.agent_node_pool,
+    helm_release.render_node_pool,
   ]
 }

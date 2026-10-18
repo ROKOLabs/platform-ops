@@ -301,6 +301,17 @@ variable "agent_node_idle_timeout" {
   }
 }
 
+variable "render_warm_spares" {
+  description = "Render-sized placeholder pods kept on the renders NodePool, so a Status Report PDF or a prototype thumbnail starts on a node that already exists. 0 turns the placeholders off. NAP shape only: before the subnet grant, render Jobs run on the default pool with no placeholders. The renders NodePool consolidates on `agent_node_idle_timeout`."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.render_warm_spares >= 0 && floor(var.render_warm_spares) == var.render_warm_spares
+    error_message = "render_warm_spares must be a whole number, 0 or more."
+  }
+}
+
 variable "agent_node_class_name" {
   description = "The AKSNodeClass the agents NodePool provisions from. Node auto-provisioning creates `default`. NAP shape only."
   type        = string

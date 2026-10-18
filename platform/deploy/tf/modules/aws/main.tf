@@ -720,6 +720,9 @@ locals {
         # The dedicated agent NodePool and the warm pool (agent-warm-pool.tf).
         local.agent_warm_pool_chart_values,
       )
+
+      # Render Jobs for Status Report PDFs and prototype thumbnails (renders.tf).
+      renders = local.render_chart_values
     }
 
     web = {
@@ -790,11 +793,13 @@ resource "helm_release" "platform" {
   # The chart templates a SecretStore and two ExternalSecrets, so the operator's
   # CRDs have to be registered before Helm applies them. That edge is not
   # expressible through a value, so it is written here. The same for KEDA's
-  # ScaledObject, and for the agents NodePool the agent Jobs select.
+  # ScaledObject, and for the agents and renders NodePools the Jobs select.
   depends_on = [
     module.external_secrets,
     helm_release.keda,
     helm_release.agent_node_pool,
+    helm_release.render_node_pool,
+    aws_secretsmanager_secret_version.render,
   ]
 }
 
