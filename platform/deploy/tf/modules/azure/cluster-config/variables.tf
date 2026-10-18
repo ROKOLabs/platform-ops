@@ -23,3 +23,8 @@ variable "agents_namespace" {
   type    = string
   default = "agents"
 }
+
+variable "renders_namespace" {
+  type    = string
+  default = "renders"
+}

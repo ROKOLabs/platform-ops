@@ -108,6 +108,7 @@ override_module {
   outputs = {
     service_namespace          = "service"
     external_secrets_namespace = "external-secrets"
+    renders_namespace          = "renders"
   }
 }
 

@@ -106,5 +106,6 @@ run "no_builtin_node_pool_fails_the_plan" {
     node_pools = []
   }
 
-  expect_failures = [helm_release.agent_node_pool]
+  # The renders NodePool (renders.tf) needs the same NodeClass.
+  expect_failures = [helm_release.agent_node_pool, helm_release.render_node_pool]
 }

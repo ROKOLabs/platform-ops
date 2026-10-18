@@ -32,6 +32,16 @@ resource "kubernetes_namespace_v1" "agents" {
   }
 }
 
+# Render Jobs (Roko CR-475): a headless Chromium per Status Report PDF or
+# prototype thumbnail, created at runtime by the API. The roko-api chart
+# renders the API's Role, the NetworkPolicy, the prepull DaemonSet and the
+# placeholders into it.
+resource "kubernetes_namespace_v1" "renders" {
+  metadata {
+    name = var.renders_namespace
+  }
+}
+
 resource "helm_release" "external_secrets" {
   name       = "external-secrets"
   namespace  = kubernetes_namespace_v1.external_secrets.metadata[0].name

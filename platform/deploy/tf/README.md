@@ -347,6 +347,36 @@ sequenceDiagram
   fallback needs KEDA 2.17 or later. An older add-on means a `helm_release`
   of `kedacore/keda` in its place.
 
+## Render nodes
+
+The platform saves an approved Status Report as a PDF, and a prototype
+flavor as its thumbnail, in a headless Chromium that runs as one Kubernetes
+Job per render in the `renders` namespace (Roko CR-475). The API creates each
+Job, drives its browser, reads the result back and deletes the Job. A render
+pod has no service account token and no cloud identity, so nothing here grants
+it storage access.
+
+| Part | AWS | Azure with NAP | Azure before the subnet grant |
+| --- | --- | --- | --- |
+| `renders` namespace | Created by the module | Created by `cluster-config` | Created by `cluster-config` |
+| `renders` NodePool | Local `agent-node-pool` chart, EKS `default` NodeClass | Local chart, `AKSNodeClass` named by `agent_node_class_name` | None: render Jobs run on the default pool |
+| Signing secret | Secrets Manager `<name>/api-render` | Key Vault `api-render` | Key Vault `api-render` |
+| Placeholders | `render_warm_spares`, default 1 | `render_warm_spares`, default 1 | None |
+
+- The chart side (`api.renders`) is in the platform release after 0.0.23. An
+  older chart ignores `api.renders`: the namespace, pool and secret exist,
+  nothing runs in them, and the Status Report export opens the reader's print
+  dialog, as before.
+- A placeholder is a pause pod at priority -10, the size of one render pod
+  (1 CPU and 1Gi, plus 50m and 64Mi for its proxy). A render Job preempts it
+  and starts at once on a node that already exists. `render_warm_spares = 0`
+  turns the placeholders off: a render then waits for Karpenter to launch a
+  node, up to about a minute.
+- The pool keeps an empty node for `agent_node_idle_timeout`, the same variable
+  as the agents pool, and sets no Karpenter limit.
+- On AWS the plan fails when `node_pools` is empty, for the same reason as the
+  agents pool.
+
 ## Day two
 
 **Upgrade to a new release.** Change the `?ref=` in your `source` and apply. One
@@ -750,7 +780,8 @@ Every name defaults to one derived from `name`, which is what a new deployment w
 | `agent_bedrock_model_arns` | list(string) | any model in the account | Bedrock model and inference-profile ARNs the agent and API roles may invoke. |
 | `agent_checkpoint_prefix` | string | `sessions` | Key prefix session checkpoints are written under. Must match roko-api's `CHECKPOINT_PREFIX` (`sessions`). Both IAM grants are scoped to it. |
 | `agent_checkpoint_expiration_days` | number | `30` | Backstop expiry for checkpoint objects the backend's own cleanup missed. |
-| `agent_node_idle_timeout` | string | `30s` | How long an empty node on the agents NodePool stays up, as a Karpenter duration. |
+| `agent_node_idle_timeout` | string | `30s` | How long an empty node on the agents or renders NodePool stays up, as a Karpenter duration. |
+| `render_warm_spares` | number | `1` | Render-sized placeholder pods on the renders NodePool. 0 turns them off. |
 
 ### Budget and tagging
 
@@ -864,7 +895,8 @@ The same shape with Azure's own names. Four names are required rather than deriv
 
 | Input | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `agent_node_idle_timeout` | string | `30s` | How long an empty node on the agents NodePool stays up, as a Karpenter duration. NAP shape only. |
+| `agent_node_idle_timeout` | string | `30s` | How long an empty node on the agents or renders NodePool stays up, as a Karpenter duration. NAP shape only. |
+| `render_warm_spares` | number | `1` | Render-sized placeholder pods on the renders NodePool. 0 turns them off. NAP shape only. |
 | `agent_node_class_name` | string | `default` | The `AKSNodeClass` the agents NodePool provisions from. NAP shape only. |
 | `roles_granted_by_client` | set(string) | `null` | `null`: Terraform creates the AKS subnet role assignment. A set: the client creates it by hand, and each entry names a `required_role_assignments` row that is in place; the only key is `aks-subnet`. Without it the cluster keeps the pre-NAP shape. See "Clients that grant roles themselves". |
 | `key_vault_authorization` | string | `rbac` | `rbac` grants through role assignments. `access_policy` grants through vault access policies, which Contributor alone can write. Switching an existing vault needs `roleAssignments/write` in either direction, so choose before the first apply. |
