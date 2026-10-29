@@ -130,3 +130,10 @@ output "tickets_identity_principal_id" { value = module.roko.tickets_identity_pr
 # What a client that grants roles itself must grant. Terraform creates these
 # rows itself when `roles_granted_by_client` is null.
 output "required_role_assignments" { value = module.roko.required_role_assignments }
+
+# The token that starts the first root session, before the deployment has an
+# Identity Provider: `terraform output -raw root_token`.
+output "root_token" {
+  value     = module.roko.root_token
+  sensitive = true
+}

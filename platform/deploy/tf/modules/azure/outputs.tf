@@ -101,6 +101,12 @@ output "origin_allowed_cidrs" {
   }
 }
 
+output "root_token" {
+  description = "Starts a root session at `/root`, the way in before the deployment has an Identity Provider. Read it with `terraform output -raw root_token`."
+  value       = random_password.root_token.result
+  sensitive   = true
+}
+
 output "platform_version" {
   description = "The release this module deploys, so a deployment can assert what it is running."
   value       = local.platform_version
