@@ -9,7 +9,6 @@ platform. It is public, so nothing here needs a token to fetch.
 | Component | What it is |
 | --- | --- |
 | [Terraform modules](platform/deploy/tf/README.md) | One composed module per cloud, `aws` and `azure`. A deployment sets one `source` and gets its whole infrastructure and the platform running on it. Start with the setup guide. |
-| [Deploy reporting adapter](platform/feature/pipeline/deploy-reporting/README.md) | Reports a finished deployment back to the platform, wrapped as a GitHub Action. |
 
 ## Versioning
 
