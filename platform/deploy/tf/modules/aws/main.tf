@@ -228,6 +228,26 @@ resource "aws_secretsmanager_secret_version" "secret_encryption" {
   secret_string = jsonencode({ SECRET_ENCRYPTION_KEY = random_bytes.secret_encryption_key.base64 })
 }
 
+# The token that starts a root session, the only way in before the deployment
+# has an Identity Provider. With AUTH_MODE=idp the API refuses to start without
+# it, so it is generated here rather than left to a person.
+resource "random_password" "root_token" {
+  length  = 48
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "root_token" {
+  name = "${var.name}/api-root-token"
+  tags = local.tags
+}
+
+# The chart's ExternalSecret reads ROOT_TOKEN out of this JSON, so the shape is
+# part of the contract.
+resource "aws_secretsmanager_secret_version" "root_token" {
+  secret_id     = aws_secretsmanager_secret.root_token.id
+  secret_string = jsonencode({ ROOT_TOKEN = random_password.root_token.result })
+}
+
 # ── Object storage ───────────────────────────────────────────────────────────
 
 resource "aws_s3_bucket" "uploads" {
@@ -711,6 +731,7 @@ locals {
       artifacts = { bucket = aws_s3_bucket.uploads.bucket }
 
       secretEncryption = { secretName = aws_secretsmanager_secret.secret_encryption.name }
+      rootToken        = { secretName = aws_secretsmanager_secret.root_token.name }
 
       agents = merge(
         {

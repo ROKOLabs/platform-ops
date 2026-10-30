@@ -95,6 +95,13 @@ module "roko" {
   telemetry = { deployment_name = "acme" } # CHANGE ME: the client name in the Deployments Portal
 }
 
-# The two values Ops needs to create the DNS record, and nothing else.
+# The two values Ops needs to create the DNS record.
 output "hostname" { value = module.roko.hostname }
 output "ingress_hostname" { value = module.roko.ingress_hostname }
+
+# The token that starts the first root session, before the deployment has an
+# Identity Provider: `terraform output -raw root_token`.
+output "root_token" {
+  value     = module.roko.root_token
+  sensitive = true
+}

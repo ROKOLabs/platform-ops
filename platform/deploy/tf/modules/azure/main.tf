@@ -116,8 +116,8 @@ module "keyvault" {
   authorization              = var.key_vault_authorization
   soft_delete_retention_days = var.key_vault_soft_delete_retention_days
 
-  # The Terraform principal writes the database URL and the encryption key below,
-  # so it needs Secrets Officer on the vault it just created.
+  # The Terraform principal writes the database URL, the encryption key and the
+  # root token below, so it needs Secrets Officer on the vault it just created.
   admin_object_ids = concat(
     [data.azurerm_client_config.current.object_id],
     var.extra_secrets_officer_object_ids,
@@ -205,8 +205,9 @@ resource "azurerm_role_assignment" "kubelet_acr_pull" {
 
 # ── Secrets ──────────────────────────────────────────────────────────────────
 #
-# The database URL is written by `./postgres`. The encryption key is generated
-# here, so a fresh deployment cannot silently ship without it.
+# The database URL is written by `./postgres`. The encryption key and the root
+# token are generated here, so a fresh deployment cannot silently ship without
+# them.
 
 resource "random_bytes" "secret_encryption_key" {
   length = 32
@@ -218,6 +219,25 @@ resource "azurerm_key_vault_secret" "secret_encryption" {
   name         = "api-secret-encryption"
   key_vault_id = module.keyvault.vault_id
   value        = jsonencode({ SECRET_ENCRYPTION_KEY = random_bytes.secret_encryption_key.base64 })
+
+  # Same reason as the database URL: the grant must exist and have propagated.
+  depends_on = [module.keyvault]
+}
+
+# The token that starts a root session, the only way in before the deployment
+# has an Identity Provider. With AUTH_MODE=idp the API refuses to start without
+# it, so it is generated here rather than left to a person.
+resource "random_password" "root_token" {
+  length  = 48
+  special = false
+}
+
+# The chart's ExternalSecret reads ROOT_TOKEN out of this JSON, so the shape is
+# part of the contract.
+resource "azurerm_key_vault_secret" "root_token" {
+  name         = "api-root-token"
+  key_vault_id = module.keyvault.vault_id
+  value        = jsonencode({ ROOT_TOKEN = random_password.root_token.result })
 
   # Same reason as the database URL: the grant must exist and have propagated.
   depends_on = [module.keyvault]
@@ -413,6 +433,7 @@ locals {
       }
 
       secretEncryption = { secretName = azurerm_key_vault_secret.secret_encryption.name }
+      rootToken        = { secretName = azurerm_key_vault_secret.root_token.name }
 
       # Bedrock is unreachable from AKS: the pod has no AWS identity. Foundry
       # discovery and model tests use the ambient workload identity.

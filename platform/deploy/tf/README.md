@@ -43,7 +43,7 @@ flowchart LR
   api -- launches --> jobs
   jobs --> checkpoints
   secrets --> eso
-  eso -- database credential, encryption key --> api
+  eso -- database credential, encryption key, root token --> api
 ```
 
 Everything inside the box is one module and one state. Cloudflare is the only
@@ -154,9 +154,10 @@ While it runs, this is what Terraform generates so that nobody has to:
 | --- | --- |
 | Postgres master credential | Secrets Manager on AWS, or the whole `postgres://` URL into Key Vault on Azure. |
 | `SECRET_ENCRYPTION_KEY` | The same store, as `{"SECRET_ENCRYPTION_KEY": "..."}`. Without it, saving a model-provider or code-host credential answers 409. |
+| `ROOT_TOKEN` | The same store, as `{"ROOT_TOKEN": "..."}`: 48 random letters and digits, under `<name>/api-root-token` on AWS and `api-root-token` on Azure. It starts a root session at `/root`, the way in before the deployment has an Identity Provider. Read it with `terraform output -raw root_token`, which the example roots re-export. |
 | Origin certificate | Self-signed for your hostname, ten-year validity. Imported into ACM on AWS; written into the TLS Secret on Azure. |
 
-External Secrets Operator projects the first two into the namespace. The module
+External Secrets Operator projects the first three into the namespace. The module
 takes no secret as an input, so there is nothing to paste in and nothing to
 leak.
 
@@ -779,6 +780,7 @@ Every name defaults to one derived from `name`, which is what a new deployment w
 | `tls_secret_id` | The certificate the load balancer serves. Null unless `tls_mode` is `provided`. |
 | `origin_allowed_cidrs` | The Cloudflare ranges this apply allowed, as `{ipv4, ipv6}`, so drift is visible in a plan. |
 | `platform_version` | The release this module deploys. |
+| `root_token` | Sensitive. The token that starts a root session at `/root`. The same value is in the secret store. |
 | `api_ecr_repository_url`, `web_ecr_repository_url`, `agent_ecr_repository_url` | Registries a lane that builds its own images pushes to. |
 | `telemetry_otlp_endpoint` | In-cluster OTLP/HTTP URL of the telemetry gateway. Null when telemetry is disabled. |
 | `telemetry_headers_secret` | `{name, arn}` of the Secrets Manager secret the ingest key goes into. Null when telemetry is disabled. |
@@ -895,6 +897,7 @@ The names match `modules/aws` wherever the thing behind them matches, so a calle
 | `tls_secret_id` | The Secret to drop a certificate into. Null unless `tls_mode` is `provided`. |
 | `origin_allowed_cidrs` | The Cloudflare ranges this apply allowed. |
 | `platform_version` | The release this module deploys. |
+| `root_token` | Sensitive. The token that starts a root session at `/root`. The same value is in the secret store. |
 | `acr_login_server` | Registry a lane that builds its own images pushes to. Null when `acr_enabled` is false. |
 | `aks_control_plane_principal_id` | Principal ID of the AKS control-plane identity, for the client that grants it subnet access itself. |
 | `required_role_assignments` | The role assignments `roles_granted_by_client` covers, as `{key, purpose, principal_id, role, scope}` rows; today the AKS subnet grant. Terraform creates them when the variable is null; the client creates them otherwise. |
