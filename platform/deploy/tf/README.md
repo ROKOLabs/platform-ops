@@ -329,8 +329,8 @@ sequenceDiagram
 | `api.agents.warmPool.enabled` | `true` | `true` | `false` |
 
 - The chart side of the warm pool (the placeholders, the ScaledObject and the
-  pre-pull DaemonSet) is in platform 0.0.25 and later. `platform_version` in
-  each module's `version.tf` pins the chart, so a deployment at `?ref=0.0.25`
+  pre-pull DaemonSet) is in platform 0.0.24 and later. `platform_version` in
+  each module's `version.tf` pins the chart, so a deployment at `?ref=0.0.24`
   or later gets both halves. An older chart ignores `api.agents.warmPool`:
   the pool and KEDA exist, agent Jobs land on the pool, and no placeholder
   renders.
