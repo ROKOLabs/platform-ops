@@ -35,7 +35,13 @@ locals {
   # Merged into the API's chart values in main.tf.
   agent_warm_pool_chart_values = {
     nodePool = local.agent_node_pool_name
-    warmPool = { enabled = true }
+    warmPool = {
+      enabled = true
+      # What one placeholder reserves, so a session of that size fits the node
+      # it preempts (agent_warm_pool_size in variables.tf).
+      cpu    = var.agent_warm_pool_size.cpu
+      memory = var.agent_warm_pool_size.memory
+    }
   }
 }
 

@@ -108,6 +108,7 @@ override_module {
   outputs = {
     service_namespace          = "service"
     external_secrets_namespace = "external-secrets"
+    renders_namespace          = "renders"
   }
 }
 
@@ -146,8 +147,8 @@ run "nap" {
   }
 
   assert {
-    condition     = local.platform_values.api.agents.warmPool.enabled == true
-    error_message = "api.agents.warmPool.enabled must be true under NAP, where the KEDA add-on runs."
+    condition     = local.platform_values.api.agents.warmPool == { enabled = true, cpu = "8", memory = "32Gi" }
+    error_message = "api.agents.warmPool must be on under NAP, where the KEDA add-on runs, with placeholders of 8 CPU and 32Gi by default."
   }
 }
 
@@ -156,11 +157,17 @@ run "nap_node_class_override" {
 
   variables {
     agent_node_class_name = "agents"
+    agent_warm_pool_size  = { cpu = "4", memory = "16Gi" }
   }
 
   assert {
     condition     = yamldecode(helm_release.agent_node_pool[0].values[0]).nodeClassRef.name == "agents"
     error_message = "agent_node_class_name must name the AKSNodeClass the pool references."
+  }
+
+  assert {
+    condition     = local.platform_values.api.agents.warmPool.cpu == "4" && local.platform_values.api.agents.warmPool.memory == "16Gi"
+    error_message = "The placeholder size must come from agent_warm_pool_size."
   }
 }
 

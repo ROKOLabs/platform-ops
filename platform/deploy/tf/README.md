@@ -26,6 +26,9 @@ flowchart LR
       subgraph agents["namespace: agents"]
         jobs[agent Jobs]
       end
+      subgraph renders["namespace: renders"]
+        render[render Jobs]
+      end
       eso[External Secrets Operator]
     end
 
@@ -41,6 +44,7 @@ flowchart LR
   api --> pg
   api --> uploads
   api -- launches --> jobs
+  api -- draws decks --> render
   jobs --> checkpoints
   secrets --> eso
   eso -- database credential, encryption key, root token --> api
@@ -335,18 +339,35 @@ sequenceDiagram
   the pool and KEDA exist, agent Jobs land on the pool, and no placeholder
   renders.
 - Each placeholder repels the others across nodes, so a spare is always one
-  node sized for one agent, and leaves when its placeholder goes.
+  node sized for one placeholder, and leaves when its placeholder goes.
+- A placeholder reserves `agent_warm_pool_size`, 8 CPU and 32Gi by default,
+  and a session fits the node it frees only when its template asks for no
+  more. Set the variable to the largest session template the deployment's
+  projects use. A smaller value makes each spare node cheaper and sends a
+  larger session to a cold node.
 - The pool keeps an empty node for `agent_node_idle_timeout`, a variable on
   each module. It sets no Karpenter limit: `api.agents.maxConcurrency` in the
-  chart values bounds launched agents plus spares, and each agent lands on a
-  16 vCPU node, so that value times 16 is the on-demand vCPU capacity the
-  account's EC2 or Azure quota has to cover.
+  chart values bounds launched agents plus spares, and each spare node is
+  sized from `agent_warm_pool_size`, so that value times the placeholder's
+  CPU is the on-demand vCPU capacity the account's EC2 or Azure quota has to
+  cover.
 - On AWS the pool references the `default` NodeClass, which EKS Auto Mode
   provisions only while a built-in NodePool is enabled. The plan fails when
   `node_pools` is empty.
 - The AKS add-on version is confirmed on the first NAP apply: the warm pool's
   fallback needs KEDA 2.17 or later. An older add-on means a `helm_release`
   of `kedacore/keda` in its place.
+
+## Slide pictures
+
+An uploaded PowerPoint deck is drawn as a rail of slide pictures (Roko
+CR-513). The API runs one render Job per deck in the `renders` namespace,
+which both modules create, and the platform chart puts the API's Role there
+once `api.slides.enabled` is set, which both modules do. A render pod holds no
+credential and no service account token, and the three images it runs come
+from Docker Hub, pinned by digest in the chart. Nothing cloud-side is granted.
+An older chart ignores the key, and a chart with the key turned off shows
+every deck as Failed with renderer-unavailable.
 
 ## Day two
 
@@ -752,6 +773,7 @@ Every name defaults to one derived from `name`, which is what a new deployment w
 | `agent_checkpoint_prefix` | string | `sessions` | Key prefix session checkpoints are written under. Must match roko-api's `CHECKPOINT_PREFIX` (`sessions`). Both IAM grants are scoped to it. |
 | `agent_checkpoint_expiration_days` | number | `30` | Backstop expiry for checkpoint objects the backend's own cleanup missed. |
 | `agent_node_idle_timeout` | string | `30s` | How long an empty node on the agents NodePool stays up, as a Karpenter duration. |
+| `agent_warm_pool_size` | object | `{ cpu = "8", memory = "32Gi" }` | CPU and memory one warm pool placeholder reserves. Set it to the largest session template in use. |
 
 ### Budget and tagging
 
@@ -867,6 +889,7 @@ The same shape with Azure's own names. Four names are required rather than deriv
 | Input | Type | Default | Purpose |
 | --- | --- | --- | --- |
 | `agent_node_idle_timeout` | string | `30s` | How long an empty node on the agents NodePool stays up, as a Karpenter duration. NAP shape only. |
+| `agent_warm_pool_size` | object | `{ cpu = "8", memory = "32Gi" }` | CPU and memory one warm pool placeholder reserves. Set it to the largest session template in use. NAP shape only. |
 | `agent_node_class_name` | string | `default` | The `AKSNodeClass` the agents NodePool provisions from. NAP shape only. |
 | `roles_granted_by_client` | set(string) | `null` | `null`: Terraform creates the AKS subnet role assignment. A set: the client creates it by hand, and each entry names a `required_role_assignments` row that is in place; the only key is `aks-subnet`. Without it the cluster keeps the pre-NAP shape. See "Clients that grant roles themselves". |
 | `key_vault_authorization` | string | `rbac` | `rbac` grants through role assignments. `access_policy` grants through vault access policies, which Contributor alone can write. Switching an existing vault needs `roleAssignments/write` in either direction, so choose before the first apply. |

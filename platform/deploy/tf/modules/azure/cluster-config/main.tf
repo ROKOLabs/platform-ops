@@ -32,6 +32,15 @@ resource "kubernetes_namespace_v1" "agents" {
   }
 }
 
+# Slide render Jobs (Roko CR-513) run here: one pod per uploaded deck, holding
+# no credential and no service account token. The API creates them at runtime,
+# and the platform chart puts the API's Role here once `slides.enabled` is set.
+resource "kubernetes_namespace_v1" "renders" {
+  metadata {
+    name = var.renders_namespace
+  }
+}
+
 resource "helm_release" "external_secrets" {
   name       = "external-secrets"
   namespace  = kubernetes_namespace_v1.external_secrets.metadata[0].name
