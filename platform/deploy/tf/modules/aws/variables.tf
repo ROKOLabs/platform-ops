@@ -250,7 +250,7 @@ variable "agent_checkpoint_expiration_days" {
 }
 
 variable "agent_node_idle_timeout" {
-  description = "How long an empty node on the agents NodePool stays up before Karpenter removes it, as a Karpenter duration (`consolidateAfter`). The warm pool's placeholders keep a node from being empty while a run started in the last hour, so this covers only the tail after they go."
+  description = "How long an empty node on the agents or renders NodePool stays up before Karpenter removes it, as a Karpenter duration (`consolidateAfter`). The warm pool's placeholders keep a node from being empty while a run started in the last hour, so this covers only the tail after they go."
   type        = string
   default     = "30s"
 
@@ -264,6 +264,17 @@ variable "keda_chart_version" {
   description = "kedacore/keda chart version installed into the cluster. KEDA scales the warm pool's placeholder Deployment from the API."
   type        = string
   default     = "2.20.2"
+}
+
+variable "render_warm_spares" {
+  description = "Render-sized placeholder pods kept on the renders NodePool, so a Status Report PDF or a prototype thumbnail starts on a node that already exists. 0 turns the placeholders off: a render then waits for Karpenter to launch a node. The renders NodePool consolidates on `agent_node_idle_timeout`."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.render_warm_spares >= 0 && floor(var.render_warm_spares) == var.render_warm_spares
+    error_message = "render_warm_spares must be a whole number, 0 or more."
+  }
 }
 
 # ── Budget ───────────────────────────────────────────────────────────────────
