@@ -53,7 +53,7 @@ output "origin_allowed_cidrs" {
 }
 
 output "root_token" {
-  description = "Starts a root session at `/root`, the way in before the deployment has an Identity Provider. Read it with `terraform output -raw root_token`."
+  description = "Starts a root session at `/app/root`, the way in before the deployment has an Identity Provider. Read it with `terraform output -raw root_token`."
   value       = random_password.root_token.result
   sensitive   = true
 }

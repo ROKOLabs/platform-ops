@@ -85,18 +85,21 @@ locals {
 # A `lifecycle` precondition rather than a `check` block: a check block reports a
 # warning and exits zero, so a plan would still be applied.
 resource "terraform_data" "cluster_access_preflight" {
-  input = local.terraform_principal_arn
+  input = {
+    admin_principals = local.admin_principal_arns
+    plan_principals  = var.plan_principal_arns
+  }
 
   lifecycle {
     precondition {
-      condition = var.grant_terraform_principal_admin || contains(
+      condition = var.grant_terraform_principal_admin || contains(var.plan_principal_arns, local.terraform_principal_arn) || contains(
         var.admin_principal_arns,
         local.terraform_principal_arn,
       )
       error_message = join("", [
         "grant_terraform_principal_admin is off and ",
         local.terraform_principal_arn,
-        " is not in admin_principal_arns, so this apply would create the cluster and then fail Unauthorized on the first namespace. Add that ARN to admin_principal_arns, or turn the grant back on.",
+        " is not in admin_principal_arns or plan_principal_arns. Add an apply identity to admin_principal_arns, or a read-only plan identity to plan_principal_arns.",
       ])
     }
   }
@@ -720,8 +723,9 @@ locals {
         tag        = local.image_tag
       }
 
-      aws       = { region = var.region }
-      publicUrl = "https://${var.ingress_host}"
+      highAvailability = var.high_availability
+      aws              = { region = var.region }
+      publicUrl        = "https://${var.ingress_host}"
 
       db = {
         host      = aws_db_instance.platform.address
@@ -749,7 +753,8 @@ locals {
         tag        = local.image_tag
       }
 
-      aws = { region = var.region }
+      highAvailability = var.high_availability
+      aws              = { region = var.region }
     }
 
     ingress = {

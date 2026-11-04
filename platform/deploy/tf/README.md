@@ -154,7 +154,7 @@ While it runs, this is what Terraform generates so that nobody has to:
 | --- | --- |
 | Postgres master credential | Secrets Manager on AWS, or the whole `postgres://` URL into Key Vault on Azure. |
 | `SECRET_ENCRYPTION_KEY` | The same store, as `{"SECRET_ENCRYPTION_KEY": "..."}`. Without it, saving a model-provider or code-host credential answers 409. |
-| `ROOT_TOKEN` | The same store, as `{"ROOT_TOKEN": "..."}`: 48 random letters and digits, under `<name>/api-root-token` on AWS and `api-root-token` on Azure. It starts a root session at `/root`, the way in before the deployment has an Identity Provider. Read it with `terraform output -raw root_token`, which the example roots re-export. |
+| `ROOT_TOKEN` | The same store, as `{"ROOT_TOKEN": "..."}`: 48 random letters and digits, under `<name>/api-root-token` on AWS and `api-root-token` on Azure. It starts a root session at `/app/root`, the way in before the deployment has an Identity Provider. Read it with `terraform output -raw root_token`, which the example roots re-export. |
 | Origin certificate | Self-signed for your hostname, ten-year validity. Imported into ACM on AWS; written into the TLS Secret on Azure. |
 
 External Secrets Operator projects the first three into the namespace. The module
@@ -695,10 +695,11 @@ module "roko" {
 | `vpc_cidr` | string | `10.0.0.0/20` | VPC range. Cannot be changed after creation. A /20 gives each zone a /22 for pods and a /24 for load balancers. |
 | `private_subnet_cidrs` | list(string) | `[]` | Private subnet CIDRs, one per zone, in the order of `azs`. Empty derives them from `vpc_cidr`. Set them only to match subnets that already exist. |
 | `public_subnet_cidrs` | list(string) | `[]` | Public subnet CIDRs, same rule. |
-| `high_availability` | bool | `false` | On runs a NAT gateway per zone and a standby database in a second zone. Off shares one NAT gateway and runs a single database. It decides what is duplicated across the zones in `azs`; it does not change how many zones there are. |
+| `high_availability` | bool | `false` | On runs a NAT gateway per zone and a standby database in a second zone. Charts that support `highAvailability` also spread API and web replicas across zones and add disruption budgets. Off shares one NAT gateway and runs a single database. It decides what is duplicated across the zones in `azs`; it does not change how many zones there are. |
 | `kubernetes_version` | string | `1.36` | EKS version. Standard support runs to August 2027. |
 | `node_pools` | list(string) | `["general-purpose", "system"]` | The built-in Auto Mode NodePools to enable. At least one must stay on: the agents NodePool needs the `default` NodeClass that exists only while one is enabled. |
 | `admin_principal_arns` | list(string) | `[]` | Principals granted cluster admin, on top of whoever applies. Roles and users both work. Use the FULL pathful ARN: EKS rejects path-stripped SSO role ARNs. |
+| `plan_principal_arns` | list(string) | `[]` | Separate IAM roles for Terraform plans. Grants Kubernetes get/list/watch on named resource kinds, including Helm Secrets, but no exec or proxy subresources. AWS read permissions are managed by the caller. |
 | `viewer_principal_arns` | list(string) | `[]` | Principals granted cluster-wide read access. Same pathful-ARN rule. |
 | `grant_terraform_principal_admin` | bool | `true` | Grants cluster admin to the identity applying the module, resolved through its session context so an SSO role keeps its path. Turn it off only where two identities apply the same state, and list both instead. |
 
@@ -780,7 +781,7 @@ Every name defaults to one derived from `name`, which is what a new deployment w
 | `tls_secret_id` | The certificate the load balancer serves. Null unless `tls_mode` is `provided`. |
 | `origin_allowed_cidrs` | The Cloudflare ranges this apply allowed, as `{ipv4, ipv6}`, so drift is visible in a plan. |
 | `platform_version` | The release this module deploys. |
-| `root_token` | Sensitive. The token that starts a root session at `/root`. The same value is in the secret store. |
+| `root_token` | Sensitive. The token that starts a root session at `/app/root`. The same value is in the secret store. |
 | `api_ecr_repository_url`, `web_ecr_repository_url`, `agent_ecr_repository_url` | Registries a lane that builds its own images pushes to. |
 | `telemetry_otlp_endpoint` | In-cluster OTLP/HTTP URL of the telemetry gateway. Null when telemetry is disabled. |
 | `telemetry_headers_secret` | `{name, arn}` of the Secrets Manager secret the ingest key goes into. Null when telemetry is disabled. |
@@ -897,7 +898,7 @@ The names match `modules/aws` wherever the thing behind them matches, so a calle
 | `tls_secret_id` | The Secret to drop a certificate into. Null unless `tls_mode` is `provided`. |
 | `origin_allowed_cidrs` | The Cloudflare ranges this apply allowed. |
 | `platform_version` | The release this module deploys. |
-| `root_token` | Sensitive. The token that starts a root session at `/root`. The same value is in the secret store. |
+| `root_token` | Sensitive. The token that starts a root session at `/app/root`. The same value is in the secret store. |
 | `acr_login_server` | Registry a lane that builds its own images pushes to. Null when `acr_enabled` is false. |
 | `aks_control_plane_principal_id` | Principal ID of the AKS control-plane identity, for the client that grants it subnet access itself. |
 | `required_role_assignments` | The role assignments `roles_granted_by_client` covers, as `{key, purpose, principal_id, role, scope}` rows; today the AKS subnet grant. Terraform creates them when the variable is null; the client creates them otherwise. |

@@ -323,3 +323,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "plan_principal_arns" {
+  description = "IAM principals allowed to read Kubernetes resources, including Helm release Secrets, for Terraform plans. They receive no Kubernetes write permissions. Keep separate from admin_principal_arns and viewer_principal_arns."
+  type        = list(string)
+  default     = []
+}
