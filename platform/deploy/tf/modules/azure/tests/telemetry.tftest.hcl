@@ -288,3 +288,36 @@ run "invalid_endpoint_fails" {
 
   expect_failures = [var.telemetry]
 }
+
+run "trusted_proxy_hops_ingress_only" {
+  command = plan
+
+  variables {
+    restrict_origin_to_cloudflare = false
+  }
+
+  assert {
+    condition     = local.platform_values.api.trustedProxyHops == 1
+    error_message = "Without Cloudflare the API must trust the ingress alone."
+  }
+}
+
+run "trusted_proxy_hops_behind_cloudflare" {
+  command = plan
+
+  variables {
+    restrict_origin_to_cloudflare = true
+  }
+
+  override_data {
+    target = data.http.cloudflare_ips[0]
+    values = {
+      response_body = "{\"result\":{\"ipv4_cidrs\":[\"173.245.48.0/20\"],\"ipv6_cidrs\":[\"2400:cb00::/32\"]}}"
+    }
+  }
+
+  assert {
+    condition     = local.platform_values.api.trustedProxyHops == 2
+    error_message = "Behind Cloudflare the API must trust Cloudflare and the ingress."
+  }
+}

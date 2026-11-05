@@ -381,6 +381,13 @@ resource "helm_release" "ingress_nginx" {
 # ── The platform itself ──────────────────────────────────────────────────────
 
 locals {
+  # The proxies in front of the API: Cloudflare and the ingress, or the ingress
+  # alone. The built-in IdP reads the forwarded protocol only when this is above
+  # 0. At 0 it publishes http endpoints and every sign-in through it fails.
+  trusted_proxy_hops = var.restrict_origin_to_cloudflare ? 2 : 1
+}
+
+locals {
   base_platform_values = {
     api = {
       image = {
@@ -388,8 +395,9 @@ locals {
         tag        = local.image_tag
       }
 
-      hostingProvider = "azure"
-      publicUrl       = "https://${var.ingress_host}"
+      hostingProvider  = "azure"
+      publicUrl        = "https://${var.ingress_host}"
+      trustedProxyHops = local.trusted_proxy_hops
 
       # Object storage is Azure Blob. Credentials come from Workload Identity, so
       # no key is set anywhere.
