@@ -1,0 +1,104 @@
+variable "name" {
+  description = "Resource name prefix, e.g. rokolabs-dev."
+  type        = string
+}
+
+variable "location" {
+  type = string
+}
+
+variable "resource_group_name" {
+  type = string
+}
+
+variable "oidc_issuer_url" {
+  description = "AKS OIDC issuer the federated credentials trust."
+  type        = string
+}
+
+variable "storage_account_id" {
+  description = "Scope for the api identity's Storage Blob Data Contributor grant."
+  type        = string
+}
+
+variable "key_vault_id" {
+  description = "Scope for the external-secrets identity's Key Vault Secrets User grant."
+  type        = string
+}
+
+variable "foundry_account_id" {
+  description = "Scope for the API identity's Foundry User grant."
+  type        = string
+}
+
+variable "subscription_id" {
+  description = "Azure subscription that contains the Foundry User built-in role definition."
+  type        = string
+}
+
+variable "key_vault_authorization" {
+  description = "The vault's permission model, `rbac` or `access_policy`. Under `access_policy` this module grants the external-secrets identity read access itself."
+  type        = string
+  default     = "rbac"
+}
+
+variable "service_namespace" {
+  description = "Namespace of the roko-api ServiceAccount."
+  type        = string
+  default     = "service"
+}
+
+variable "api_service_account" {
+  type    = string
+  default = "roko-api"
+}
+
+variable "agents_namespace" {
+  description = "Namespace of the agent Job ServiceAccount."
+  type        = string
+  default     = "agents"
+}
+
+variable "agent_service_account" {
+  description = "ServiceAccount used by agent Jobs."
+  type        = string
+  default     = "agent"
+}
+
+variable "external_secrets_namespace" {
+  type    = string
+  default = "external-secrets"
+}
+
+variable "external_secrets_service_account" {
+  type    = string
+  default = "external-secrets"
+}
+
+variable "tags" {
+  type    = map(string)
+  default = {}
+}
+
+variable "telemetry_enabled" {
+  description = "Create the identity the telemetry gateway reads Azure Monitor metrics with."
+  type        = bool
+  default     = false
+}
+
+variable "postgres_server_id" {
+  description = "Scope for the telemetry identity's Monitoring Reader grant. Required when `telemetry_enabled` is true."
+  type        = string
+  default     = null
+}
+
+variable "telemetry_namespace" {
+  description = "Namespace of the telemetry gateway ServiceAccount."
+  type        = string
+  default     = "telemetry"
+}
+
+variable "telemetry_service_account" {
+  type    = string
+  default = "otel-gateway"
+}

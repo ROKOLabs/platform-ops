@@ -54,7 +54,8 @@ module "eks" {
     },
     {
       for arn in distinct(var.viewer_principal_arns) : "viewer-${arn}" => {
-        principal_arn = arn
+        principal_arn     = arn
+        kubernetes_groups = lookup(var.viewer_principal_kubernetes_groups, arn, [])
         policy_associations = {
           viewer = {
             policy_arn   = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"

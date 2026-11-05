@@ -36,3 +36,9 @@ variable "create_oidc_provider" {
   type        = bool
   default     = true
 }
+
+variable "existing_oidc_provider_arn" {
+  description = "Existing provider ARN, avoiding a data lookup and a broad module dependency."
+  type        = string
+  default     = null
+}

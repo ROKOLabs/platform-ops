@@ -43,3 +43,8 @@ variable "tags" {
   type    = map(string)
   default = {}
 }
+
+variable "viewer_principal_kubernetes_groups" {
+  type    = map(list(string))
+  default = {}
+}

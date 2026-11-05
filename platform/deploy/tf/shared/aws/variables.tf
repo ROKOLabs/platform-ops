@@ -1,0 +1,379 @@
+variable "name" {
+  description = "Name prefix for every resource this module creates, for example `acme-prod`."
+  type        = string
+}
+
+variable "region" {
+  description = "AWS region. Must match the region the calling provider is configured for."
+  type        = string
+}
+
+variable "ingress_host" {
+  description = "Public hostname the platform serves, for example `eyeq.rokolabs.ai`. It names the Ingress host rule and the origin certificate."
+  type        = string
+}
+
+variable "api_allowed_cidrs" {
+  description = "CIDRs allowed to reach the EKS public API endpoint. Required, with no default, because the only safe default is the one somebody chose: an open control plane is a decision, not an accident. Terraform itself reaches the cluster through this endpoint, so the address applying this module has to be in the list."
+  type        = list(string)
+}
+
+# ── Network ──────────────────────────────────────────────────────────────────
+
+variable "vpc_cidr" {
+  description = "VPC CIDR. Cannot be changed after creation. A /20 gives each zone a /22 for pods and a /24 for load balancers, which is ample for this platform; widen it only for a deployment that will run much more in the cluster."
+  type        = string
+  default     = "10.0.0.0/20"
+}
+
+variable "private_subnet_cidrs" {
+  description = "Private subnet CIDRs, one per zone, in the same order as `azs`. Empty derives them from `vpc_cidr`. Set them only to match subnets that already exist."
+  type        = list(string)
+  default     = []
+}
+
+variable "public_subnet_cidrs" {
+  description = "Public subnet CIDRs, one per zone, in the same order as `azs`. Empty derives them from `vpc_cidr`."
+  type        = list(string)
+  default     = []
+}
+
+variable "azs" {
+  description = "Availability zones. One private and one public subnet are created per zone, sized from `vpc_cidr`. Three is the sensible floor rather than two: a zone is also where compute comes from, and in a constrained region a third zone is often the difference between a node being provisioned and a pod staying Pending. It is independent of `high_availability`, which decides what is duplicated across the zones you list."
+  type        = list(string)
+}
+
+variable "high_availability" {
+  description = "One switch for the two places a deployment trades cost against surviving the loss of a zone: on runs a NAT gateway per zone rather than one shared, and a standby database in a second zone. Off is the default because losing a zone is rare and both cost real money every month; turn it on for a deployment whose downtime costs more than the standby does."
+  type        = bool
+  default     = false
+}
+
+# ── Cluster access ───────────────────────────────────────────────────────────
+
+variable "node_pools" {
+  description = "The built-in EKS Auto Mode NodePools to enable: `general-purpose`, `system`, or both. At least one must stay on: EKS provisions the `default` NodeClass the agents NodePool references only while one is enabled, and the plan fails otherwise."
+  type        = list(string)
+  default     = ["general-purpose", "system"]
+
+  validation {
+    condition     = alltrue([for pool in var.node_pools : contains(["general-purpose", "system"], pool)])
+    error_message = "node_pools accepts only \"general-purpose\" and \"system\"."
+  }
+}
+
+variable "kubernetes_version" {
+  description = "EKS Kubernetes version. 1.36 leaves standard support in August 2027; a version already near its end date puts a deployment into an upgrade or into extended-support pricing shortly after it is created."
+  type        = string
+  default     = "1.36"
+}
+
+variable "admin_principal_arns" {
+  description = "IAM principal ARNs granted cluster admin, in addition to whoever applies this module. Roles and users both work. Use the FULL pathful ARN: EKS rejects path-stripped SSO role ARNs as invalid principals."
+  type        = list(string)
+  default     = []
+}
+
+variable "viewer_principal_arns" {
+  description = "IAM principal ARNs granted cluster-wide read access. Same pathful-ARN rule as above."
+  type        = list(string)
+  default     = []
+}
+
+variable "grant_terraform_principal_admin" {
+  description = "Grant cluster admin to the identity applying this module. Terraform reaches the cluster through the same endpoint it just created, so without access of its own the apply builds the network, the cluster and the database and then fails Unauthorized on the first namespace. Turn it off only where two identities apply the same state, because the entry then follows whichever one applied last and every apply shows a diff; list them both in `admin_principal_arns` instead."
+  type        = bool
+  default     = true
+}
+
+# ── TLS ──────────────────────────────────────────────────────────────────────
+
+variable "tls_mode" {
+  description = "`self_signed` generates the origin certificate during the apply and imports it into ACM; the deployment sits behind Cloudflare, which presents the certificate a browser checks. `provided` uses the ACM certificate named by `tls_certificate_arn` instead and generates nothing."
+  type        = string
+  default     = "self_signed"
+
+  validation {
+    condition     = contains(["self_signed", "provided"], var.tls_mode)
+    error_message = "tls_mode must be `self_signed` or `provided`."
+  }
+}
+
+variable "tls_certificate_arn" {
+  description = "ACM certificate ARN the load balancer serves. Required when `tls_mode` is `provided`, ignored otherwise."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.tls_mode != "provided" || var.tls_certificate_arn != ""
+    error_message = "tls_certificate_arn is required when tls_mode is `provided`."
+  }
+}
+
+variable "restrict_origin_to_cloudflare" {
+  description = "true restricts the load balancer to Cloudflare's published address ranges, read from https://api.cloudflare.com/client/v4/ips during the apply. It is what makes an unvalidated Cloudflare-to-origin hop acceptable, so leave it on unless the deployment does not sit behind Cloudflare."
+  type        = bool
+  default     = true
+}
+
+variable "extra_origin_cidrs" {
+  description = "Additional IPv4 CIDRs allowed to reach the load balancer, on top of Cloudflare's. Use it to reach a locked-down origin directly for debugging."
+  type        = list(string)
+  default     = []
+}
+
+# ── Database ─────────────────────────────────────────────────────────────────
+
+variable "db_instance_class" {
+  description = "Postgres instance class."
+  type        = string
+  default     = "db.t4g.micro"
+}
+
+variable "db_allocated_storage" {
+  description = "Postgres storage in GiB."
+  type        = number
+  default     = 20
+}
+
+variable "db_engine_version" {
+  description = "Postgres major version, or a full minor version to pin one. AWS resolves a major to its current minor and keeps it there through the maintenance window."
+  type        = string
+  default     = "17"
+}
+
+variable "db_apply_immediately" {
+  description = "false applies an instance class, storage or credential change in the next maintenance window. true applies it at once, with the reboot that implies, which is what a deployment nobody depends on wants and a deployment somebody depends on does not."
+  type        = bool
+  default     = false
+}
+
+variable "db_backup_retention_days" {
+  description = "Automated backup retention."
+  type        = number
+  default     = 7
+}
+
+variable "db_deletion_protection" {
+  description = "true refuses to destroy the instance until it is turned off and applied."
+  type        = bool
+  default     = true
+}
+
+# ── Images and chart ─────────────────────────────────────────────────────────
+
+variable "image_registry" {
+  description = "Registry the chart pulls images from."
+  type        = string
+  default     = "docker.io/rokoplatform"
+}
+
+variable "image_names" {
+  description = "Repository name of each image inside `image_registry`. The defaults are what release.yml publishes to Docker Hub; a deployment that builds its own images into ECR names its own repositories here."
+  type = object({
+    api   = optional(string, "api")
+    web   = optional(string, "web")
+    agent = optional(string, "agent")
+  })
+  default = {}
+}
+
+variable "image_tag" {
+  description = "Image tag. Empty means the module's own version, which is the release it deploys. Set only by a lane that builds its own images."
+  type        = string
+  default     = ""
+}
+
+variable "chart_values" {
+  description = "Chart values merged over the values the module computes. The merge is deep, so overriding one nested key leaves its siblings in place."
+  type        = any
+  default     = {}
+}
+
+# ── Names ────────────────────────────────────────────────────────────────────
+#
+# Every name defaults to one derived from `name`, which is what a new deployment
+# wants. They are overridable because a bucket name and a repository name are
+# both force-new and a bucket holding objects cannot be renamed, so a deployment
+# adopting resources that already exist has to be able to state their names
+# rather than move their contents.
+
+variable "uploads_bucket_name" {
+  description = "Uploads bucket. Empty means `<name>-uploads`."
+  type        = string
+  default     = ""
+}
+
+variable "checkpoints_bucket_name" {
+  description = "Agent checkpoints bucket. Empty means `<name>-agent-checkpoints`."
+  type        = string
+  default     = ""
+}
+
+variable "ecr_repository_names" {
+  description = "ECR repository per image. Each unset key means `<name>-<key>`."
+  type = object({
+    api   = optional(string)
+    web   = optional(string)
+    agent = optional(string)
+  })
+  default = {}
+}
+
+variable "artifact_cors_origins" {
+  description = "Browser origins allowed to PUT/GET the uploads bucket through presigned URLs. Empty means the deployment's own `https://<ingress_host>` alone."
+  type        = list(string)
+  default     = []
+}
+
+# ── Agents ───────────────────────────────────────────────────────────────────
+
+variable "agent_bedrock_model_arns" {
+  description = "Bedrock model and inference-profile ARNs the agent and API roles may invoke. The model catalogue changes at the speed of vendor releases, so the default covers any model in the account; the boundary doing the work is the run's isolated namespace."
+  type        = list(string)
+  default = [
+    "arn:aws:bedrock:*::foundation-model/*",
+    "arn:aws:bedrock:*:*:inference-profile/*",
+  ]
+}
+
+variable "agent_checkpoint_prefix" {
+  description = "Key prefix the session host writes checkpoints under. roko-api sets CHECKPOINT_PREFIX=sessions on every session pod. Both IAM grants are scoped to it."
+  type        = string
+  default     = "sessions"
+}
+
+variable "agent_checkpoint_expiration_days" {
+  description = "Backstop expiry for checkpoint objects the backend's own cleanup and daily sweep did not remove."
+  type        = number
+  default     = 30
+}
+
+variable "agent_node_idle_timeout" {
+  description = "How long an empty node on the agents NodePool stays up before Karpenter removes it, as a Karpenter duration (`consolidateAfter`). The warm pool's placeholders keep a node from being empty while a run started in the last hour, so this covers only the tail after they go."
+  type        = string
+  default     = "30s"
+
+  validation {
+    condition     = can(regex("^[0-9]+(ns|us|µs|ms|s|m|h)$", var.agent_node_idle_timeout))
+    error_message = "agent_node_idle_timeout must be a Karpenter duration such as \"30s\" or \"1h\"."
+  }
+}
+
+variable "keda_chart_version" {
+  description = "kedacore/keda chart version installed into the cluster. KEDA scales the warm pool's placeholder Deployment from the API."
+  type        = string
+  default     = "2.20.2"
+}
+
+# ── Budget ───────────────────────────────────────────────────────────────────
+
+variable "monthly_budget_usd" {
+  description = "Monthly cost budget in USD. Null creates no budget."
+  type        = number
+  default     = null
+}
+
+variable "budget_notify_emails" {
+  description = "Addresses the budget alerts. Required when `monthly_budget_usd` is set."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = var.monthly_budget_usd == null || length(var.budget_notify_emails) > 0
+    error_message = "budget_notify_emails is required when monthly_budget_usd is set."
+  }
+}
+
+# ── Telemetry ────────────────────────────────────────────────────────────────
+
+variable "telemetry" {
+  description = "OpenTelemetry Collector that exports app telemetry, pod and node CPU and memory, cluster state, Postgres statistics and RDS host metrics to an OTLP endpoint. On by default, sending to `https://otlp.rokolabs.ai`, which accepts `http/protobuf` only. `protocol` is `http/protobuf` or `grpc`. `header_names` are the headers sent with every export; their values come from the `telemetry_headers_secret` secret, never from Terraform. `deployment_name` is the `roko.deployment` attribute on every signal; null means `name`."
+  type = object({
+    enabled         = optional(bool, true)
+    endpoint        = optional(string, "https://otlp.rokolabs.ai")
+    protocol        = optional(string, "http/protobuf")
+    header_names    = optional(list(string), ["api-key"])
+    deployment_name = optional(string)
+  })
+  default  = {}
+  nullable = false
+
+  validation {
+    condition     = can(regex("^https?://.+", var.telemetry.endpoint))
+    error_message = "telemetry.endpoint must be an http:// or https:// URL."
+  }
+
+  validation {
+    condition     = contains(["http/protobuf", "grpc"], var.telemetry.protocol)
+    error_message = "telemetry.protocol must be \"http/protobuf\" or \"grpc\"."
+  }
+}
+
+# ── Misc ─────────────────────────────────────────────────────────────────────
+
+variable "external_secrets_chart_version" {
+  description = "external-secrets chart version installed into the cluster."
+  type        = string
+  default     = "2.8.0"
+}
+
+variable "tags" {
+  description = "Tags added to every taggable resource."
+  type        = map(string)
+  default     = {}
+}
+
+variable "plan_principal_arns" {
+  description = "IAM principals allowed to read Kubernetes resources, including Helm release Secrets, for Terraform plans. They receive no Kubernetes write permissions. Keep separate from admin_principal_arns and viewer_principal_arns."
+  type        = list(string)
+  default     = []
+}
+
+variable "chart_path" {
+  description = "Local chart directory or archive. Empty uses the published chart."
+  type        = string
+  default     = ""
+}
+variable "chart_version" {
+  description = "Published chart version override. Empty uses this module's release."
+  type        = string
+  default     = ""
+}
+variable "chart_repository" {
+  description = "Registry for a published chart."
+  type        = string
+  default     = "oci://registry-1.docker.io/rokoplatform"
+}
+variable "existing_encryption_secret_name" {
+  description = "Adopt an existing encryption secret without reading or rotating its value. Empty generates a new key."
+  type        = string
+  default     = ""
+}
+variable "manage_agent_node_pool" {
+  description = "Create the agents NodePool with Helm. False retains a deployment's existing Terraform-managed NodePool."
+  type        = bool
+  default     = true
+}
+variable "viewer_principal_kubernetes_groups" {
+  description = "Extra Kubernetes groups for viewer principals."
+  type        = map(list(string))
+  default     = {}
+}
+variable "ecr_untagged_expiry_days" {
+  description = "Retention for untagged image layers."
+  type        = number
+  default     = 365
+}
+
+variable "external_admin_principal_arns" {
+  description = "Apply principals whose cluster access is managed by a separate bootstrap state."
+  type        = list(string)
+  default     = []
+}
+
+variable "network_tags" {
+  description = "Additional tags for the network and cluster, preserving adopted deployment metadata."
+  type        = map(string)
+  default     = {}
+}

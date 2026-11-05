@@ -1,0 +1,157 @@
+output "cluster_name" {
+  description = "For `az aks get-credentials` and for CI."
+  value       = module.aks.cluster_name
+}
+
+output "cluster_endpoint" {
+  description = "Configures the deployment's own Kubernetes and Helm providers."
+  value       = module.aks.kube_host
+  sensitive   = true
+}
+
+output "cluster_ca_certificate" {
+  description = "Base64 cluster CA, for the same two providers."
+  value       = module.aks.kube_cluster_ca_certificate
+  sensitive   = true
+}
+
+# AKS hands out an admin kubeconfig that authenticates with a client
+# certificate. A provider given only the host and the CA has no credential at
+# all and every Kubernetes and Helm resource fails unauthorized.
+output "cluster_client_certificate" {
+  description = "Base64 client certificate for the Kubernetes and Helm providers."
+  value       = module.aks.kube_client_certificate
+  sensitive   = true
+}
+
+output "cluster_client_key" {
+  description = "Base64 client key for the Kubernetes and Helm providers."
+  value       = module.aks.kube_client_key
+  sensitive   = true
+}
+
+output "resource_group_name" {
+  description = "Resource group holding the deployment."
+  value       = azurerm_resource_group.this.name
+}
+
+output "db_host" {
+  description = "Postgres endpoint. The pod reads the whole URL from Key Vault; this is for a person connecting by hand."
+  value       = module.postgres.fqdn
+}
+
+output "uploads_bucket" {
+  description = "Blob container the Artifacts and Prototypes features use."
+  value       = module.storage.container_name
+}
+
+output "checkpoints_bucket" {
+  description = "Blob container the agent supervisor writes run checkpoints to."
+  value       = module.storage.checkpoints_container_name
+}
+
+output "aks_control_plane_principal_id" {
+  description = "Principal ID of the AKS control-plane identity, for the client that grants it subnet access itself."
+  value       = module.aks.control_plane_principal_id
+}
+
+output "required_role_assignments" {
+  description = "Role assignments the client grants itself when `roles_granted_by_client` is a set; Terraform creates them when it is null. Grant each row, then add its `key` to `roles_granted_by_client`."
+  value = [
+    {
+      key          = "aks-subnet"
+      purpose      = "The AKS control plane joins NAP nodes to the subnet"
+      principal_id = module.aks.control_plane_principal_id
+      role         = "Network Contributor"
+      scope        = module.vnet.aks_subnet_id
+    },
+  ]
+}
+
+output "tickets_identity_client_id" {
+  description = "Client ID passed to roko-api so it can request Azure DevOps tokens."
+  value       = module.workload_identity.tickets_client_id
+}
+
+output "tickets_identity_principal_id" {
+  description = "Object ID an Azure DevOps administrator uses to find the tickets identity."
+  value       = module.workload_identity.tickets_principal_id
+}
+
+output "hostname" {
+  description = "The name this deployment serves, echoed back, so Ops knows the record to create."
+  value       = var.ingress_host
+}
+
+output "ingress_hostname" {
+  description = "Load balancer address Roko points its proxied Cloudflare record at. On Azure it is a static IP, so the record is an A. Null until the controller's Service has been given one."
+  value       = data.kubernetes_service_v1.ingress_nginx.status[0].load_balancer[0].ingress[0].ip
+}
+
+output "tls_secret_id" {
+  description = "The Secret to drop a certificate into. Null unless `tls_mode` is `provided`."
+  value       = var.tls_mode == "provided" ? kubernetes_secret_v1.origin_tls.metadata[0].name : null
+}
+
+output "origin_allowed_cidrs" {
+  description = "Cloudflare ranges this apply allowed, so drift from what Cloudflare publishes now is visible in a plan."
+  value = {
+    ipv4 = local.origin_ipv4_cidrs
+    ipv6 = local.origin_ipv6_cidrs
+  }
+}
+
+output "root_token" {
+  description = "Starts a root session at `/root`, the way in before the deployment has an Identity Provider. Read it with `terraform output -raw root_token`."
+  value       = random_password.root_token.result
+  sensitive   = true
+}
+
+output "platform_version" {
+  description = "The release this module deploys, so a deployment can assert what it is running."
+  value       = local.platform_version
+}
+
+output "acr_login_server" {
+  description = "Registry a lane that builds its own images pushes to. Null when acr_enabled is false."
+  value       = one(module.acr[*].login_server)
+}
+
+output "foundry_openai_endpoint" {
+  description = "Endpoint a person pastes into Settings, Models, beside an account API key."
+  value       = module.foundry.openai_endpoint
+}
+
+output "foundry_account_id" {
+  description = "Foundry account resource ID passed to roko-api for ambient model discovery and testing."
+  value       = module.foundry.account_id
+}
+
+output "foundry_gpt_deployment_name" {
+  description = "Deployment name that goes into the same form."
+  value       = module.foundry.gpt_deployment_name
+}
+
+output "telemetry_otlp_endpoint" {
+  description = "In-cluster OTLP/HTTP endpoint of the telemetry gateway. Null when telemetry is disabled."
+  value       = one(module.telemetry[*].otlp_http_endpoint)
+}
+
+output "telemetry_headers_secret" {
+  description = "Key Vault secret the operator writes the telemetry export headers to, as `{vault_name, secret_name}`. Null when telemetry is disabled."
+  value = local.telemetry_enabled ? {
+    vault_name  = module.keyvault.vault_name
+    secret_name = azurerm_key_vault_secret.telemetry_headers[0].name
+  } : null
+}
+
+# The address belongs to the controller's Service, which Helm created and waited
+# for, so this read always finds one.
+data "kubernetes_service_v1" "ingress_nginx" {
+  metadata {
+    name      = "ingress-nginx-controller"
+    namespace = helm_release.ingress_nginx.namespace
+  }
+
+  depends_on = [helm_release.ingress_nginx]
+}

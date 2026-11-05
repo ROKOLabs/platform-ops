@@ -1,3 +1,6 @@
+> Generated release distribution. Changes are maintained in the private platform repository. Do not edit this repository.
+> `latest` and version tags retain the existing Terraform module paths. Each release pins matching chart and image versions.
+
 # Roko platform operations
 
 Versioned components the Roko platform and its delivery systems consume. This
@@ -17,7 +20,7 @@ Pin by tag. The tag is the `ROKOLabs/platform` release it deploys. Use a semver 
 
 ```hcl
 # Pin to a semver release
-source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.25"
+source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.26"
 
 # Follow the newest release automatically
 source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=latest"

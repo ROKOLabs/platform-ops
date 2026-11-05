@@ -11,12 +11,12 @@ resource "aws_iam_openid_connect_provider" "github" {
 }
 
 data "aws_iam_openid_connect_provider" "existing" {
-  count = var.create_oidc_provider ? 0 : 1
+  count = !var.create_oidc_provider && var.existing_oidc_provider_arn == null ? 1 : 0
   url   = "https://token.actions.githubusercontent.com"
 }
 
 locals {
-  oidc_arn = var.create_oidc_provider ? aws_iam_openid_connect_provider.github[0].arn : data.aws_iam_openid_connect_provider.existing[0].arn
+  oidc_arn = var.create_oidc_provider ? aws_iam_openid_connect_provider.github[0].arn : (var.existing_oidc_provider_arn != null ? var.existing_oidc_provider_arn : data.aws_iam_openid_connect_provider.existing[0].arn)
 
   # GitHub embeds immutable numeric IDs in the sub claim
   # (repo:ORG@ORGID/REPO@REPOID:...), which also protects against a

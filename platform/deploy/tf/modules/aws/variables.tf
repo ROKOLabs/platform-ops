@@ -329,3 +329,51 @@ variable "plan_principal_arns" {
   type        = list(string)
   default     = []
 }
+
+variable "chart_path" {
+  description = "Local chart directory or archive. Empty uses the published chart."
+  type        = string
+  default     = ""
+}
+variable "chart_version" {
+  description = "Published chart version override. Empty uses this module's release."
+  type        = string
+  default     = ""
+}
+variable "chart_repository" {
+  description = "Registry for a published chart."
+  type        = string
+  default     = "oci://registry-1.docker.io/rokoplatform"
+}
+variable "existing_encryption_secret_name" {
+  description = "Adopt an existing encryption secret without reading or rotating its value. Empty generates a new key."
+  type        = string
+  default     = ""
+}
+variable "manage_agent_node_pool" {
+  description = "Create the agents NodePool with Helm. False retains a deployment's existing Terraform-managed NodePool."
+  type        = bool
+  default     = true
+}
+variable "viewer_principal_kubernetes_groups" {
+  description = "Extra Kubernetes groups for viewer principals."
+  type        = map(list(string))
+  default     = {}
+}
+variable "ecr_untagged_expiry_days" {
+  description = "Retention for untagged image layers."
+  type        = number
+  default     = 365
+}
+
+variable "external_admin_principal_arns" {
+  description = "Apply principals whose cluster access is managed by a separate bootstrap state."
+  type        = list(string)
+  default     = []
+}
+
+variable "network_tags" {
+  description = "Additional tags for the network and cluster, preserving adopted deployment metadata."
+  type        = map(string)
+  default     = {}
+}
