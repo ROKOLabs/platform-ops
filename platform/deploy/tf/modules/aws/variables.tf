@@ -260,6 +260,23 @@ variable "agent_node_idle_timeout" {
   }
 }
 
+variable "agent_warm_pool_size" {
+  description = "CPU and memory one warm pool placeholder reserves, as Kubernetes quantities. A session preempts a placeholder and starts on its node, so a session larger than this does not fit and waits for a new node instead. Set it to the largest session template the deployment's projects use. The default fits every template up to 8 CPU and 32 GiB, and each spare node is that size."
+  type = object({
+    cpu    = string
+    memory = string
+  })
+  default = {
+    cpu    = "8"
+    memory = "32Gi"
+  }
+
+  validation {
+    condition     = can(regex("^[0-9]+m?$", var.agent_warm_pool_size.cpu)) && can(regex("^[0-9]+(Mi|Gi)$", var.agent_warm_pool_size.memory))
+    error_message = "agent_warm_pool_size.cpu must be a CPU quantity such as \"8\" or \"500m\", and memory a quantity such as \"32Gi\"."
+  }
+}
+
 variable "keda_chart_version" {
   description = "kedacore/keda chart version installed into the cluster. KEDA scales the warm pool's placeholder Deployment from the API."
   type        = string

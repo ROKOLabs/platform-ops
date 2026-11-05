@@ -608,6 +608,16 @@ resource "kubernetes_namespace_v1" "agents" {
   }
 }
 
+# Slide render Jobs (Roko CR-513) run here: one pod per uploaded deck, holding
+# no credential and no service account token. The API creates them at runtime,
+# and the platform chart puts the API's Role here once `slides.enabled` is set,
+# so the namespace has to exist before the platform release.
+resource "kubernetes_namespace_v1" "renders" {
+  metadata {
+    name = "renders"
+  }
+}
+
 # ── External Secrets Operator ────────────────────────────────────────────────
 
 module "external_secrets" {
@@ -753,6 +763,15 @@ locals {
         # The dedicated agent NodePool and the warm pool (agent-warm-pool.tf).
         local.agent_warm_pool_chart_values,
       )
+
+      # Slide pictures of uploaded decks (Roko CR-513): one render Job per deck
+      # in the renders namespace, on three upstream images the chart pins. Off,
+      # every deck reads Failed with renderer-unavailable. The chart creates the
+      # API's Role in the namespace; an older chart ignores the key.
+      slides = {
+        enabled   = true
+        namespace = kubernetes_namespace_v1.renders.metadata[0].name
+      }
     }
 
     web = {

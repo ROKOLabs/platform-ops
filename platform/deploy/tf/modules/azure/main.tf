@@ -473,6 +473,16 @@ locals {
           ephemeralStorage = "8Gi"
         }
       )
+
+      # Slide pictures of uploaded decks (Roko CR-513): one render Job per deck
+      # in the renders namespace, on three upstream images the chart pins. Off,
+      # every deck reads Failed with renderer-unavailable. The chart creates the
+      # API's Role in the namespace; an older chart ignores the key. No node
+      # pool: a render pod is one CPU and 2Gi, and lands on the default pool.
+      slides = {
+        enabled   = true
+        namespace = module.cluster_config.renders_namespace
+      }
     }
 
     web = {

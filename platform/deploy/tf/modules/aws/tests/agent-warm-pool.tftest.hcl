@@ -75,8 +75,8 @@ run "defaults" {
   }
 
   assert {
-    condition     = local.platform_values.api.agents.warmPool.enabled == true
-    error_message = "api.agents.warmPool.enabled must be true where KEDA is installed."
+    condition     = local.platform_values.api.agents.warmPool == { enabled = true, cpu = "8", memory = "32Gi" }
+    error_message = "api.agents.warmPool must be on where KEDA is installed, with placeholders of 8 CPU and 32Gi by default."
   }
 }
 
@@ -86,6 +86,12 @@ run "tunables" {
   variables {
     agent_node_idle_timeout = "5m"
     keda_chart_version      = "2.21.0"
+    agent_warm_pool_size    = { cpu = "4", memory = "16Gi" }
+  }
+
+  assert {
+    condition     = local.platform_values.api.agents.warmPool.cpu == "4" && local.platform_values.api.agents.warmPool.memory == "16Gi"
+    error_message = "The placeholder size must come from agent_warm_pool_size."
   }
 
   assert {
