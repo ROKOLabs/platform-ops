@@ -716,6 +716,13 @@ locals {
 # than merged in HCL: Helm merges values documents deeply, so overriding one
 # nested key leaves its siblings alone, which an HCL `merge()` would not.
 locals {
+  # The proxies in front of the API: Cloudflare and the ingress, or the ingress
+  # alone. The built-in IdP reads the forwarded protocol only when this is above
+  # 0. At 0 it publishes http endpoints and every sign-in through it fails.
+  trusted_proxy_hops = var.restrict_origin_to_cloudflare ? 2 : 1
+}
+
+locals {
   base_platform_values = {
     api = {
       image = {
@@ -726,6 +733,7 @@ locals {
       highAvailability = var.high_availability
       aws              = { region = var.region }
       publicUrl        = "https://${var.ingress_host}"
+      trustedProxyHops = local.trusted_proxy_hops
 
       db = {
         host      = aws_db_instance.platform.address
