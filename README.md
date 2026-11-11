@@ -13,7 +13,6 @@ release channel. Each release includes matching Terraform, Helm and image versio
 - [AWS inputs](#appendix-a-modulesaws-inputs) and [outputs](#appendix-b-modulesaws-outputs)
 - [Azure inputs](#appendix-c-modulesazure-inputs) and [outputs](#appendix-d-modulesazure-outputs)
 - [Updates and rollbacks](#day-two-updates-and-rollbacks)
-- [Deploy reporting adapter](#deploy-reporting-adapter)
 
 ## Deployment
 
@@ -88,7 +87,7 @@ local, which is why it is separate.
 
 ```hcl
 module "tf_backend" {
-  source      = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws/tf-backend?ref=0.0.27"
+  source      = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws/tf-backend?ref=1.0.0"
   bucket_name = "acme-prod-tfstate"
 }
 ```
@@ -347,7 +346,7 @@ sequenceDiagram
 
 - The chart side of the warm pool (the placeholders, the ScaledObject and the
   pre-pull DaemonSet) is in platform 0.0.24 and later. `platform_version` in
-  each module's `version.tf` pins the chart, so a deployment at `?ref=0.0.27`
+  each module's `version.tf` pins the chart, so a deployment at `?ref=1.0.0`
   or later gets both halves. An older chart ignores `api.agents.warmPool`:
   the pool and KEDA exist, agent Jobs land on the pool, and no placeholder
   renders.
@@ -410,7 +409,7 @@ such a deployment also sets `restrict_origin_to_cloudflare = false`.
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.27"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=1.0.0"
 
   name         = "acme-prod"
   region       = "us-east-1"
@@ -438,7 +437,7 @@ module "roko" {
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.27"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=1.0.0"
 
   name         = "acme-prod"
   region       = "us-east-1"
@@ -458,7 +457,7 @@ A deployment migrating off hand-written Terraform states the names it already ha
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.27"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=1.0.0"
 
   name         = "rokolabs-dev"
   region       = "us-east-1"
@@ -490,7 +489,7 @@ The only supported override of the version constant. It changes the images, neve
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.27"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=1.0.0"
 
   name         = "rokolabs-dev"
   region       = "us-east-1"
@@ -547,7 +546,7 @@ that fail the backend's three-minute pod health check need a retry.
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.27"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=1.0.0"
 
   name         = "acme-prod"
   location     = "southcentralus"
@@ -640,7 +639,7 @@ Two rules keep this safe:
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.27"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=1.0.0"
 
   name         = "acme-prod"
   location     = "southcentralus"
@@ -673,7 +672,7 @@ the subnet, `roles_granted_by_client` moves the grant to the client; see
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=0.0.27"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=1.0.0"
 
   name         = "acme-prod"
   location     = "southcentralus"
@@ -953,7 +952,7 @@ To hold a deployment steady at one release, pin to the semver tag:
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.27"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=1.0.0"
   # ... rest of the configuration
 }
 ```
@@ -964,7 +963,7 @@ To roll back to an earlier release, change the `ref` to that semver and apply ag
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=0.0.27"  # rolled back
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=1.0.0"  # rolled back
   # ... rest of the configuration
 }
 
@@ -985,68 +984,3 @@ terraform get -update
 rm -rf .terraform/modules/
 terraform init
 ```
-
-## Deploy reporting adapter
-
-The deploy reporting adapter records a successful deployment in Roko after a
-delivery system finishes deploying it. Reporting does not fail the delivery job
-unless strict mode is enabled.
-
-The adapter sends the environment name and deployed commit SHA. It adds an
-internal per-invocation identifier so retries do not create duplicate records.
-It never deploys an application or infrastructure.
-
-This version assumes that each Roko project uses a Git-based version control
-system. The adapter identifies deployed work by its Git commit SHA.
-
-### GitHub Actions
-
-Add this step after the deployment step:
-
-```yaml
-- name: Report the deployment to Roko
-  uses: ROKOLabs/platform-ops/platform/feature/pipeline/deploy-reporting/wrappers/github@latest
-  with:
-    url: https://platform.example.com/api/deploys
-    token: ${{ secrets.ROKO_DEPLOY_TOKEN }}
-    environment: prod
-```
-
-Replace `@latest` with an exact release tag to pin the adapter version.
-
-The action uses `github.sha` as the commit. Set `strict: true` only when a failed
-report should fail the workflow step.
-
-### Core scripts
-
-The cores accept the same options. Run the POSIX shell core with:
-
-```sh
-./platform/feature/pipeline/deploy-reporting/core/roko-adapter.sh \
-  --url URL --token TOKEN --environment NAME [--strict]
-```
-
-Run the PowerShell core with:
-
-```powershell
-./platform/feature/pipeline/deploy-reporting/core/roko-adapter.ps1 `
-  --url URL --token TOKEN --environment NAME [--strict]
-```
-
-Each flag overrides its matching environment variable:
-
-| Flag | Environment variable |
-| --- | --- |
-| `--url` | `ROKO_ENDPOINT_URL` |
-| `--token` | `ROKO_DEPLOY_TOKEN` |
-| `--environment` | `ROKO_ENVIRONMENT` |
-| `--strict` | `ROKO_STRICT=1` |
-
-The core reads the commit from `ROKO_SHA`. When that variable is empty, it uses
-`git rev-parse HEAD`. Each invocation generates one deployment ID and reuses it
-for every retry. It makes up to five attempts for network errors, HTTP 429, and
-HTTP 5xx responses. Other HTTP errors are not retried.
-
-Without strict mode, every reporting outcome exits with code 0. With strict
-mode, missing input exits 2, an HTTP or network failure exits 3, and a missing
-`curl` command in the shell core exits 4.

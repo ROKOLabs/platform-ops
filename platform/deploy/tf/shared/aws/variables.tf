@@ -169,7 +169,7 @@ variable "image_registry" {
 }
 
 variable "image_names" {
-  description = "Repository name of each image inside `image_registry`. The defaults are what release.yml publishes to Docker Hub; a deployment that builds its own images into ECR names its own repositories here."
+  description = "Repository name of each image inside `image_registry`. The defaults are what release-platform.yml publishes to Docker Hub; a deployment that builds its own images into ECR names its own repositories here."
   type = object({
     api   = optional(string, "api")
     web   = optional(string, "web")
