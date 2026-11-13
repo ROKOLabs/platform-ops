@@ -443,10 +443,6 @@ locals {
       secretEncryption = { secretName = azurerm_key_vault_secret.secret_encryption.name }
       rootToken        = { secretName = azurerm_key_vault_secret.root_token.name }
 
-      # Bedrock is unreachable from AKS: the pod has no AWS identity. Foundry
-      # discovery and model tests use the ambient workload identity.
-      modelProviders = { allowedKinds = "azure-openai" }
-
       agents = merge(
         {
           image            = "${var.image_registry}/${var.image_names.agent}:${local.image_tag}"
