@@ -87,7 +87,7 @@ local, which is why it is separate.
 
 ```hcl
 module "tf_backend" {
-  source      = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws/tf-backend?ref=1.0.0"
+  source      = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws/tf-backend?ref=1.1.0"
   bucket_name = "acme-prod-tfstate"
 }
 ```
@@ -346,7 +346,7 @@ sequenceDiagram
 
 - The chart side of the warm pool (the placeholders, the ScaledObject and the
   pre-pull DaemonSet) is in platform 0.0.24 and later. `platform_version` in
-  each module's `version.tf` pins the chart, so a deployment at `?ref=1.0.0`
+  each module's `version.tf` pins the chart, so a deployment at `?ref=1.1.0`
   or later gets both halves. An older chart ignores `api.agents.warmPool`:
   the pool and KEDA exist, agent Jobs land on the pool, and no placeholder
   renders.
@@ -409,7 +409,7 @@ such a deployment also sets `restrict_origin_to_cloudflare = false`.
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=1.0.0"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=1.1.0"
 
   name         = "acme-prod"
   region       = "us-east-1"
@@ -437,7 +437,7 @@ module "roko" {
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=1.0.0"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=1.1.0"
 
   name         = "acme-prod"
   region       = "us-east-1"
@@ -457,7 +457,7 @@ A deployment migrating off hand-written Terraform states the names it already ha
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=1.0.0"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=1.1.0"
 
   name         = "rokolabs-dev"
   region       = "us-east-1"
@@ -489,7 +489,7 @@ The only supported override of the version constant. It changes the images, neve
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=1.0.0"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=1.1.0"
 
   name         = "rokolabs-dev"
   region       = "us-east-1"
@@ -546,7 +546,7 @@ that fail the backend's three-minute pod health check need a retry.
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=1.0.0"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=1.1.0"
 
   name         = "acme-prod"
   location     = "southcentralus"
@@ -639,7 +639,7 @@ Two rules keep this safe:
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=1.0.0"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=1.1.0"
 
   name         = "acme-prod"
   location     = "southcentralus"
@@ -672,7 +672,7 @@ the subnet, `roles_granted_by_client` moves the grant to the client; see
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=1.0.0"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=1.1.0"
 
   name         = "acme-prod"
   location     = "southcentralus"
@@ -952,7 +952,7 @@ To hold a deployment steady at one release, pin to the semver tag:
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=1.0.0"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=1.1.0"
   # ... rest of the configuration
 }
 ```
@@ -963,7 +963,7 @@ To roll back to an earlier release, change the `ref` to that semver and apply ag
 
 ```hcl
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=1.0.0"  # rolled back
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=1.1.0"  # rolled back
   # ... rest of the configuration
 }
 
