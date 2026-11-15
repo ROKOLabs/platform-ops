@@ -1,9 +1,9 @@
 {
   "files": {
     "LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
-    "README.md": "510e2bb6a0083eddf792aeec4c30eff61d3fc7dcf496919534c1983be3a8e691",
-    "platform/deploy/tf/examples/aws/main.tf": "522dbc4c15b872a0afad42f1b7217a29696b26aebcbcf6c975fbfe07ce0efbd1",
-    "platform/deploy/tf/examples/azure/main.tf": "dd4e664d5a5df3fb8ce0fd1f2201307bbdbb0ae7dd1919e3f521a2bfda4470d1",
+    "README.md": "5512cc92a73fe70b365b5732c2656adc6d9822147a2561d4648e980cb60729f8",
+    "platform/deploy/tf/examples/aws/main.tf": "59cf7d072bfc22c91427261d633519eb9ef0c42cf5d47b19a62db5d0ca8b0dc5",
+    "platform/deploy/tf/examples/azure/main.tf": "6d939512f1b88e1a20894754fd238c4420b0cfbab1b443cda56b056bce504c80",
     "platform/deploy/tf/modules/agent-node-pool/Chart.yaml": "bc2fe13ca477d39f866745fe6ea3bc1a960852c4f95964f41a10c12b3cfeb58e",
     "platform/deploy/tf/modules/agent-node-pool/templates/nodepool.yaml": "b1eee205997687c3fb662318847ae856213a96b4c6b3ea0b525e343cf447e888",
     "platform/deploy/tf/modules/agent-node-pool/values.yaml": "5664fdee77fa76df3d5babfa517b7fa5872360a60000a69deb5e87cbb00de3a1",
@@ -127,7 +127,7 @@
     "platform/deploy/tf/shared/aws/tf-backend/variables.tf": "fa26e5e6617006cae3059ecc8d4b5d76deb805c40ac9cabd884359bfa5b78ac1",
     "platform/deploy/tf/shared/aws/tf-backend/versions.tf": "34d90e8b69032355e4636f6b0e340db35abaa65ca44710a6f354ed7883869af1",
     "platform/deploy/tf/shared/aws/variables.tf": "db6d3063d53c65df37498451c0a1fb4eff8d6c8efacbc9eef8306cbd98223bfc",
-    "platform/deploy/tf/shared/aws/version.tf": "42c51c31384c45c528e96f7cbab956ef372cb984c65d5f6874d9b31a7db7ae36",
+    "platform/deploy/tf/shared/aws/version.tf": "faa6bf50b522790548aa906dbd78aa0f65717d9b46f10bf1ce0f50e5921f24ab",
     "platform/deploy/tf/shared/aws/versions.tf": "39f468940a3cc05999b0f85615e30b872f9def8ab8a95b8429029666d3ed7e74",
     "platform/deploy/tf/shared/azure/acr/main.tf": "b9894d2147a781e20cab4b54c6141ce8183b90415f71c041c60a2ff79596f8a5",
     "platform/deploy/tf/shared/azure/acr/outputs.tf": "68dcd88710692f0e87b24247f49fa8cf727f95a29d0e227cbcf1ee261208ce5b",
@@ -162,7 +162,7 @@
     "platform/deploy/tf/shared/azure/storage/versions.tf": "32b11ba41b73a6eb8bb1bca8f161a62c86483050fdfd499f4f2e45af264134cc",
     "platform/deploy/tf/shared/azure/telemetry.tf": "abf747d5073c00259b366b760aef72a83dd93c56afc0166ff006e716ef8d4de5",
     "platform/deploy/tf/shared/azure/variables.tf": "a81fa0fffc32de72821ca441b486f1f513a2a5328377a2f55e36c16c03e61d1b",
-    "platform/deploy/tf/shared/azure/version.tf": "42c51c31384c45c528e96f7cbab956ef372cb984c65d5f6874d9b31a7db7ae36",
+    "platform/deploy/tf/shared/azure/version.tf": "faa6bf50b522790548aa906dbd78aa0f65717d9b46f10bf1ce0f50e5921f24ab",
     "platform/deploy/tf/shared/azure/versions.tf": "c990ddc8967f551fc5fa5e96b798e43e4c96f8db6113296b512e1339228e6e73",
     "platform/deploy/tf/shared/azure/vnet/main.tf": "ae374a87078cf039475d83c58bb278f6575d60dc4e5d779ffc4c4c8d38499aa7",
     "platform/deploy/tf/shared/azure/vnet/outputs.tf": "7a063d32be6d5c227f69a81079bf20a98ebd7930fa1f57476bf15a0d294a2b67",
@@ -177,5 +177,5 @@
     "platform/deploy/tf/shared/telemetry/variables.tf": "ab82fa19fbed9939ce763e6efe9fa819ebd8eee71dd8df286512b79ab36167b6",
     "platform/deploy/tf/shared/telemetry/versions.tf": "f942b24334f7bbbbc0beda9ccd14ae05e4ed188cb9a768a55a32ca7d5396b380"
   },
-  "version": "1.2.0"
+  "version": "1.3.0"
 }
