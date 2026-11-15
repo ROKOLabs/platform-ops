@@ -58,7 +58,7 @@ provider "helm" {
 }
 
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=1.3.0"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/azure?ref=1.4.0"
 
   name         = "acme-prod" # CHANGE ME
   location     = "southcentralus"
