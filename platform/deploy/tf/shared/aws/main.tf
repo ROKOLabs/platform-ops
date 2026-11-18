@@ -397,9 +397,10 @@ data "aws_iam_policy_document" "pods_assume" {
 }
 
 # Least privilege: PutObject to sign uploads, GetObject to sign downloads and to
-# HEAD-confirm. Artifacts and prototypes are soft deleted and never need
-# s3:DeleteObject. The one hard delete is the daily sweep of session image
-# attachments no message claimed, so DeleteObject covers image keys only.
+# HEAD-confirm. Listed artifacts and prototypes are soft deleted. The hard
+# deletes are session attachments: images, and files a session message carries,
+# which live under artifact keys. DeleteObject covers those two prefixes, and
+# prototype keys stay out of it.
 data "aws_iam_policy_document" "api_uploads" {
   statement {
     actions   = ["s3:PutObject", "s3:GetObject"]
@@ -407,8 +408,11 @@ data "aws_iam_policy_document" "api_uploads" {
   }
 
   statement {
-    actions   = ["s3:DeleteObject"]
-    resources = ["${aws_s3_bucket.uploads.arn}/projects/*/images/*"]
+    actions = ["s3:DeleteObject"]
+    resources = [
+      "${aws_s3_bucket.uploads.arn}/projects/*/images/*",
+      "${aws_s3_bucket.uploads.arn}/projects/*/artifacts/*",
+    ]
   }
 }
 
