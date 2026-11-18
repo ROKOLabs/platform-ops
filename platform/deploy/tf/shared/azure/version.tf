@@ -1,4 +1,4 @@
 # CI stamps this default in the generated public distribution.
 locals {
-  platform_version = "1.5.0"
+  platform_version = "1.5.2"
 }
