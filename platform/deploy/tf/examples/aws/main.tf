@@ -58,7 +58,7 @@ provider "helm" {
 }
 
 module "roko" {
-  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=1.5.3"
+  source = "git::https://github.com/ROKOLabs/platform-ops.git//platform/deploy/tf/modules/aws?ref=1.5.4"
 
   name         = "acme-prod" # CHANGE ME
   region       = "us-east-1" # CHANGE ME, together with the provider above
